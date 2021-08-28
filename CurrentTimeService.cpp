@@ -82,8 +82,8 @@ namespace CurrentTimeService
     time_t CurrentTime::ToTimeT() const
     {
         tm time;
-        time.tm_year = mYear;
-        time.tm_mon = mMonth;
+        time.tm_year = mYear - 1900; // years since 1900
+        time.tm_mon = mMonth - 1;    // months since January
         time.tm_mday = mDay;
         time.tm_hour = mHours;
         time.tm_min = mMinutes;

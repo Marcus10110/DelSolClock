@@ -7,6 +7,10 @@
 
 #include "AppleMediaService.h"
 #include "CurrentTimeService.h"
+#include "Display.h"
+
+#include <time.h>
+#include <sys/time.h>
 
 
 #define APPLE_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
@@ -108,6 +112,9 @@ void setup()
     Serial.begin( 115200 );
     Serial.println( "Del Sol Clock Booting" );
 
+    Display::Begin();
+
+
     BLEDevice::init( "Del Sol" );
     pServer = BLEDevice::createServer();
     pServer->setCallbacks( new MyServerCallbacks() );
@@ -189,6 +196,16 @@ void loop()
                 media_info.dump();
             }
         }
+        tm time;
+        if( getLocalTime( &time, 100 ) )
+        {
+            Display::Clear();
+            Display::DrawTime( time.tm_hour, time.tm_min );
+        }
+        else
+        {
+            Serial.println( "failed to get time" );
+        }
     }
     else
     {
@@ -224,21 +241,6 @@ void setServiceSolicitation( BLEAdvertisementData& advertisementData, BLEUUID uu
     }
 }
 
-void UpdateHandler( BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify )
-{
-    Serial.println( "got data!" );
-    Serial.println( "got data!b" );
-    Serial.println( "got data!c" );
-    /*
-        std::string data( reinterpret_cast<char*>( pData ), length );
-        for( int i = 0; i < length; ++i )
-        {
-            Serial.print( ( char )( pData[ i ] ) );
-        }
-
-        Serial.println( "" );
-        */
-}
 
 void HandleConnection()
 {
@@ -287,7 +289,20 @@ void HandleConnection()
         Serial.println( "StartTimeService failed" );
         return;
     }
+    timeval new_time;
+    new_time.tv_sec = time.ToTimeT();
+    new_time.tv_usec = static_cast<long>( time.mSecondsFraction * 1000000 );
+    Serial.print( "Unix time stamp: " );
+    Serial.print( new_time.tv_sec );
+    Serial.print( ", usec: " );
+    Serial.println( new_time.tv_usec );
+    if( settimeofday( &new_time, nullptr ) != 0 )
+    {
+        Serial.println( "Error setting time of day" );
+    }
+
     time.Dump();
+    // Display::DrawTime( time.mHours, time.mMinutes );
 }
 
 /*
