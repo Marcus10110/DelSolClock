@@ -114,7 +114,6 @@ void setup()
 
     Display::Begin();
 
-
     BLEDevice::init( "Del Sol" );
     pServer = BLEDevice::createServer();
     pServer->setCallbacks( new MyServerCallbacks() );
@@ -196,21 +195,32 @@ void loop()
                 media_info.dump();
             }
         }
-        tm time;
-        if( getLocalTime( &time, 100 ) )
-        {
-            Display::Clear();
-            Display::DrawTime( time.tm_hour, time.tm_min );
-        }
-        else
-        {
-            Serial.println( "failed to get time" );
-        }
+        UpdateDisplay();
     }
     else
     {
         delay( 100 );
     }
+}
+
+void UpdateDisplay()
+{
+    Display::Clear();
+    tm time;
+    if( getLocalTime( &time, 100 ) )
+    {
+        Display::DrawTime( time.tm_hour, time.tm_min );
+    }
+    const auto& media_info = AppleMediaService::GetMediaInformation();
+    if( !media_info.mTitle.empty() && media_info.mPlaybackState == AppleMediaService::MediaInformation::PlaybackState::Playing )
+    {
+        Display::DrawMediaInfo( media_info );
+    }
+    else
+    {
+        Serial.println( "failed to get time" );
+    }
+    Display::DrawSpeed( 42.3 );
 }
 
 void setServiceSolicitation( BLEAdvertisementData& advertisementData, BLEUUID uuid )
@@ -302,7 +312,6 @@ void HandleConnection()
     }
 
     time.Dump();
-    // Display::DrawTime( time.mHours, time.mMinutes );
 }
 
 /*
