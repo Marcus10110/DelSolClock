@@ -7,7 +7,10 @@
 
 #include "AppleMediaService.h"
 #include "CurrentTimeService.h"
+#include "AppleNotificationCenterService.h"
 #include "Display.h"
+#include "pins.h"
+#include "CarIO.h"
 
 #include <time.h>
 #include <sys/time.h>
@@ -95,20 +98,26 @@ class NotificationSecurityCallbacks : public BLESecurityCallbacks
 
     void onAuthenticationComplete( esp_ble_auth_cmpl_t cmpl ) override
     {
-        Serial.println( "Authentication Complete!" );
         if( cmpl.success )
         {
+            Serial.println( "Authentication Successful!" );
             uint16_t length;
             esp_ble_gap_get_whitelist_size( &length );
             Serial.printf( "size: %d\n", length );
+            AuthenticationComplete = true;
         }
-        AuthenticationComplete = true;
+        else
+        {
+            Serial.println( "Authentication failed" );
+        }
     }
 };
 
 
 void setup()
 {
+    CarIO::Setup();
+
     Serial.begin( 115200 );
     Serial.println( "Del Sol Clock Booting" );
 
@@ -138,6 +147,7 @@ void setup()
     BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
     oAdvertisementData.setFlags( 0x01 );
     setServiceSolicitation( oAdvertisementData, BLEUUID( APPLE_SERVICE_UUID ) );
+    setServiceSolicitation( oAdvertisementData, BLEUUID( "7905F431-B5CE-4E99-A40F-4B1E122D00D0" ) );
     pAdvertising->setAdvertisementData( oAdvertisementData );
 
 
@@ -180,6 +190,8 @@ void loop()
     {
         delay( 2000 );
         Serial.print( "." );
+        auto car_status = CarIO::GetStatus();
+        CarIO::Print( car_status );
         if( entity_update )
         {
             // auto val = entity_update->readValue();
@@ -206,20 +218,30 @@ void loop()
 void UpdateDisplay()
 {
     Display::Clear();
+    Display::DrawIcon( Display::Icon::Bluetooth, true );
+    Display::DrawIcon( Display::Icon::Headlight, true );
+    Display::DrawIcon( Display::Icon::Shuffle, true );
+    Display::DrawIcon( Display::Icon::Repeat, true );
     tm time;
     if( getLocalTime( &time, 100 ) )
     {
         Display::DrawTime( time.tm_hour, time.tm_min );
     }
+    else
+    {
+        Serial.println( "failed to get time" );
+    }
+    /*
     const auto& media_info = AppleMediaService::GetMediaInformation();
     if( !media_info.mTitle.empty() && media_info.mPlaybackState == AppleMediaService::MediaInformation::PlaybackState::Playing )
     {
         Display::DrawMediaInfo( media_info );
     }
-    else
-    {
-        Serial.println( "failed to get time" );
-    }
+    */
+
+    auto car_status = CarIO::GetStatus();
+    Display::DrawDebugInfo( car_status.ToString() );
+
     Display::DrawSpeed( 42.3 );
 }
 
@@ -274,13 +296,20 @@ void HandleConnection()
     Serial.println( "connected using client!" );
 
     Serial.print( "Waiting for authentication" );
-    while( !AuthenticationComplete )
+    while( !AuthenticationComplete && client->isConnected() )
     {
         Serial.print( "." );
         delay( 100 );
     }
-    Serial.println( "Authentication complete" );
+    Serial.println( "Authentication finished" );
     delay( 100 );
+    if( !client->isConnected() )
+    {
+        Serial.println( "client disconnected during authentication." );
+        delete client;
+        client = nullptr;
+        return;
+    }
 
     AppleMediaService::RegisterForNotifications( []() { TrackNameDirty = true; }, AppleMediaService::NotificationLevel::TrackTitleOnly );
 
@@ -312,6 +341,13 @@ void HandleConnection()
     }
 
     time.Dump();
+
+    if( !AppleNotifications::StartNotificationService( client ) )
+    {
+        Serial.println( "failed to start the notification service" );
+        return;
+    }
+    Serial.println( "Notification service started" );
 }
 
 /*
