@@ -159,7 +159,7 @@ namespace Display
 
     void Begin()
     {
-        gDisplay.init( 135, 240 );
+        gDisplay.init( 136, 240 ); // one extra pixel removes that ugly garbage line at the bottom of the display.
         Serial.println( "display initialized" );
         gDisplay.setRotation( 3 );
 

@@ -8,6 +8,7 @@ namespace CarIO
     {
         constexpr uint8_t TftBacklightPwmChannel = 0;
         constexpr uint8_t BuzzerPwmChannel = 1;
+        bool TftPwmAttached = false;
     }
     std::string CarStatus::ToString()
     {
@@ -18,6 +19,7 @@ namespace CarIO
     }
     void Setup()
     {
+        gpio_hold_dis( static_cast<gpio_num_t>( Pin::TftLit ) );
         pinMode( Pin::TftLit, OUTPUT );
         pinMode( Pin::Battery, INPUT );
         pinMode( Pin::Illumination, INPUT );
@@ -32,6 +34,7 @@ namespace CarIO
         ledcSetup( TftBacklightPwmChannel, 5000, 8 ); // channel 0, 5 khz, 8 bit resolution
         ledcSetup( BuzzerPwmChannel, 440, 8 );        // channel 1, 5 khz, 8 bit resolution
         ledcAttachPin( Pin::TftLit, TftBacklightPwmChannel );
+        TftPwmAttached = true;
         ledcAttachPin( Pin::Buzzer, BuzzerPwmChannel );
 
         ledcWrite( TftBacklightPwmChannel, 255 );
@@ -69,7 +72,23 @@ namespace CarIO
 
     void SetTftBrightness( int brightness )
     {
-        brightness = constrain( brightness, 0, 255 );
-        ledcWrite( TftBacklightPwmChannel, brightness );
+        if( brightness > 0 && !TftPwmAttached )
+        {
+            ledcAttachPin( Pin::TftLit, TftBacklightPwmChannel );
+        }
+
+        if( TftPwmAttached )
+        {
+            brightness = constrain( brightness, 0, 255 );
+            ledcWrite( TftBacklightPwmChannel, brightness );
+        }
+
+        if( brightness == 0 && TftPwmAttached )
+        {
+            // let's just set that pin to 0.
+            ledcDetachPin( Pin::TftLit );
+            TftPwmAttached = false;
+            digitalWrite( Pin::TftLit, 0 ); // drive low.
+        }
     }
 }
