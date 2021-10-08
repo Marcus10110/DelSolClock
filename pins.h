@@ -3,13 +3,13 @@
 
 namespace Pin
 {
-    // TCT & SD Card
+    // TFT & SD Card
     constexpr int8_t TftReset = 15;
     constexpr int8_t TftCs = 14;
     constexpr int8_t TftDc = 32;
     constexpr int8_t TftLit = 27;
     constexpr int8_t SdCs = 33;
-    // software SPI
+    // SPI
     constexpr int8_t Sck = 5;
     constexpr int8_t Miso = 19;
     constexpr int8_t Mosi = 18;
@@ -25,4 +25,7 @@ namespace Pin
     constexpr int8_t Minute = 35; //  the Feather connects pin 35 to VBAT divider.
     // Other
     constexpr int8_t Buzzer = 12; // internal boot-related pull down. Use as output only.
+    // GPS (note, these are the default I2C pins)
+    constexpr int8_t GpsRx = 22;
+    constexpr int8_t GpsTx = 23;
 }

@@ -92,6 +92,7 @@
                 "C:\\Users\\markg\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\1.0.6\\tools\\sdk\\include\\fb_gfx",
                 "C:\\Users\\markg\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\1.0.6\\cores\\esp32",
                 "C:\\Users\\markg\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\1.0.6\\variants\\feather_esp32",
+                "C:\\Users\\markg\\Documents\\Arduino\\libraries\\TinyGPSPLUS\\src",
                 "C:\\Users\\markg\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\1.0.6\\libraries\\BLE\\src",
                 "C:\\Users\\markg\\Documents\\Arduino\\libraries\\Adafruit_GFX_Library",
                 "C:\\Users\\markg\\Documents\\Arduino\\libraries\\Adafruit_ST7735_and_ST7789_Library",
