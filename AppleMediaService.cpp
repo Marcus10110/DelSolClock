@@ -176,9 +176,11 @@ namespace AppleMediaService
                         gMediaInformation.mQueueCount = String( value.c_str() ).toInt();
                         break;
                     case QueueAttributeIDShuffleMode:
+                        notify = true;
                         gMediaInformation.mShuffleMode = static_cast<MediaInformation::ShuffleMode>( String( value.c_str() ).toInt() );
                         break;
                     case QueueAttributeIDRepeatMode:
+                        notify = true;
                         gMediaInformation.mRepeatMode = static_cast<MediaInformation::RepeatMode>( String( value.c_str() ).toInt() );
                         break;
                     }
@@ -190,6 +192,7 @@ namespace AppleMediaService
                     {
                     case TrackAttributeIDArtist:
                         gMediaInformation.mArtist = value;
+                        notify = true;
                         break;
                     case TrackAttributeIDAlbum:
                         gMediaInformation.mAlbum = value;

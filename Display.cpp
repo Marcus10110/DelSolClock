@@ -50,14 +50,15 @@ SPIClass* BuildDisplaySpi()
     return vspi;
 }
 
-SPIClass* gDisplaySpi = BuildDisplaySpi();
-Adafruit_ST7789 gDisplay = Adafruit_ST7789( gDisplaySpi, Pin::TftCs, Pin::TftDc, Pin::TftReset );
-SPIFFS_ImageReader reader;
 
 namespace Display
 {
     namespace
     {
+        SPIClass* gDisplaySpi = BuildDisplaySpi();
+        Adafruit_ST7789 gDisplay = Adafruit_ST7789( gDisplaySpi, Pin::TftCs, Pin::TftDc, Pin::TftReset );
+        SPIFFS_ImageReader reader;
+        DisplayState State;
         struct Rect
         {
             int16_t x;
@@ -134,6 +135,28 @@ namespace Display
             }
         }
     }
+
+    bool DisplayState::operator==( const DisplayState& rhs ) const
+    {
+        return mHours24 == rhs.mHours24 && mMinutes == rhs.mMinutes && mSpead == rhs.mSpead && mIconHeadlight == rhs.mIconHeadlight &&
+               mIconBluetooth == rhs.mIconBluetooth && mIconShuffle == rhs.mIconShuffle && mIconRepeat == rhs.mIconRepeat &&
+               mMediaTitle == rhs.mMediaTitle && mMediaArtist == rhs.mMediaArtist;
+    }
+
+    bool DisplayState::operator!=( const DisplayState& rhs ) const
+    {
+        return !( *this == rhs );
+    }
+
+    void DisplayState::Dump() const
+    {
+        Serial.printf( "time: %u:%u\n", mHours24, mMinutes );
+        Serial.printf( "speed: %f\n", mSpead );
+        Serial.printf( "icons: %i, %i, %i, %i\n", mIconHeadlight, mIconBluetooth, mIconShuffle, mIconRepeat );
+        Serial.printf( "title: %s\n", mMediaTitle.c_str() );
+        Serial.printf( "artist: %s\n", mMediaArtist.c_str() );
+    }
+
     void Begin()
     {
         gDisplay.init( 135, 240 );
@@ -151,31 +174,6 @@ namespace Display
         gDisplay.setTextWrap( true );
         gDisplay.setFont( NormalFont );
         gDisplay.setTextSize( NormalFontSize );
-        /*
-        // font test.
-        gDisplay.setTextSize( 1 );
-        gDisplay.setFont( nullptr );
-        gDisplay.println( "Default font, 1x size displayed" );
-        gDisplay.setTextSize( 2 );
-        gDisplay.println( "Default Font, 2x size displayed" );
-        gDisplay.setTextSize( 1 );
-        gDisplay.setFont( &FreeMono9pt7b );
-        gDisplay.println( "FreeMono9pt7b Font, 1x size displayed" );
-        gDisplay.setFont( &FreeMono12pt7b );
-        gDisplay.println( "FreeMono12pt7b Font, 1x size displayed" );
-
-        delay( 60000 );
-        */
-
-        /*
-        DrawTime( 12, 59 );
-        AppleMediaService::MediaInformation info;
-        info.mTitle = "Clocks";
-        info.mAlbum = "A Rush of Blood to the Head";
-        info.mArtist = "Coldplay";
-        DrawMediaInfo( info );
-        DrawSpeed( 42.314159 );
-        */
 
         if( !SPIFFS.begin() )
         {
@@ -183,7 +181,6 @@ namespace Display
             return;
         }
         reader.drawBMP( "/OldSols.bmp", gDisplay, 0, 0 );
-        delay( 5000 );
     }
 
     void Clear()
@@ -193,6 +190,8 @@ namespace Display
 
     void DrawTime( uint8_t hours24, uint8_t minutes )
     {
+        State.mHours24 = hours24;
+        State.mMinutes = minutes;
         bool isAfternoon = hours24 >= 12;
         uint8_t hours12 = 0;
         if( hours24 == 0 )
@@ -236,6 +235,7 @@ namespace Display
 
     void DrawSpeed( float speed )
     {
+        State.mSpead = speed;
         if( speed > 1 )
         {
             char display_string[ 20 ] = { 0 };
@@ -264,18 +264,28 @@ namespace Display
             filename = "/light_small.bmp"; // 32x32
             y = 0;
             x = ScreenRect.x + ScreenRect.w - 32;
+            State.mIconHeadlight = visible;
             break;
         case Icon::Bluetooth:
             filename = "/bluetooth.bmp"; // 14x22
             y = top;
+            State.mIconBluetooth = visible;
+            if( !visible )
+            {
+                // Hack: display red logo instead
+                visible = true;
+                filename = "/bluetooth_red.bmp"; // 14x22
+            }
             break;
         case Icon::Shuffle:
             filename = "/shuffle.bmp"; // 24x24
             y = top + 24;
+            State.mIconShuffle = visible;
             break;
         case Icon::Repeat:
             filename = "/repeat.bmp"; // 24x24
             y = top + 24 * 2;
+            State.mIconRepeat = visible;
             break;
         default:
             break;
@@ -283,34 +293,40 @@ namespace Display
 
         if( visible )
         {
-            Serial.print( "icon x: " );
-            Serial.print( x );
-            Serial.print( " y: " );
-            Serial.print( y );
-            Serial.print( " file: " );
-            Serial.println( filename );
             reader.drawBMP( filename, gDisplay, x, y );
         }
     }
 
-    void DrawMediaInfo( const AppleMediaService::MediaInformation& media_info )
+    void DrawMediaInfo( const std::string& title, const std::string& artist )
     {
+        State.mMediaArtist = artist;
+        State.mMediaTitle = title;
         char display_string[ 128 ] = { 0 };
-        snprintf( display_string, sizeof( display_string ), "%s\n%s", media_info.mTitle.c_str(), media_info.mArtist.c_str() );
+        snprintf( display_string, sizeof( display_string ), "%s\n%s", title.c_str(), artist.c_str() );
         gDisplay.setTextColor( DefaultTextColor );
+        gDisplay.setTextWrap( false );
         int16_t x, y;
         GetTextLocation( display_string, HorizontalAlignment::Left, VerticalAlignment::Bottom, &x, &y );
         gDisplay.setCursor( x, y );
         gDisplay.print( display_string );
+        gDisplay.setTextWrap( true );
     }
 
-    void DrawDebugInfo( const std::string& message )
+    void DrawDebugInfo( const std::string& message, bool center )
     {
         gDisplay.setFont( nullptr );
         gDisplay.setTextColor( DefaultTextColor );
         int16_t x, y;
         auto str = message.c_str();
-        GetTextLocation( str, HorizontalAlignment::Left, VerticalAlignment::Bottom, &x, &y );
+        if( center )
+        {
+            GetTextLocation( str, HorizontalAlignment::Center, VerticalAlignment::Center, &x, &y );
+        }
+        else
+        {
+            GetTextLocation( str, HorizontalAlignment::Center, VerticalAlignment::Bottom, &x, &y );
+        }
+
         gDisplay.setCursor( x, y );
         gDisplay.print( str );
         gDisplay.setFont( NormalFont );
@@ -320,5 +336,30 @@ namespace Display
     {
         gDisplay.enableSleep( sleep );
         CarIO::SetTftBrightness( sleep ? 0 : 255 );
+    }
+
+    const DisplayState& GetState()
+    {
+        return State;
+    }
+
+    void DrawState( const DisplayState& state )
+    {
+        Clear();
+        DrawTime( state.mHours24, state.mMinutes );
+        DrawSpeed( state.mSpead );
+        DrawIcon( Icon::Headlight, state.mIconHeadlight );
+        DrawIcon( Icon::Bluetooth, state.mIconBluetooth );
+        DrawIcon( Icon::Shuffle, state.mIconShuffle );
+        DrawIcon( Icon::Repeat, state.mIconRepeat );
+        if( !state.mMediaTitle.empty() || !state.mMediaArtist.empty() )
+        {
+            DrawMediaInfo( state.mMediaTitle, state.mMediaArtist );
+        }
+        else
+        {
+            State.mMediaArtist = "";
+            State.mMediaTitle = "";
+        }
     }
 }

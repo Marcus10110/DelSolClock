@@ -1,118 +1,16 @@
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include <BLESecurity.h>
-#include <BLE2902.h>
-#include <BLE2904.h>
-
 #include "AppleMediaService.h"
 #include "CurrentTimeService.h"
 #include "AppleNotificationCenterService.h"
 #include "Display.h"
 #include "pins.h"
 #include "CarIO.h"
-
+#include "Bluetooth.h"
 #include <time.h>
 #include <sys/time.h>
 
 
-#define APPLE_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
-
-#define DELSOL_VEHICLE_SERVICE_UUID "8fb88487-73cf-4cce-b495-505a4b54b802"
-#define DELSOL_STATUS_CHARACTERISTIC_UUID "40d527f5-3204-44a2-a4ee-d8d3c16f970e"
-#define DELSOL_BETTERY_CHARACTERISTIC_UUID "40d527f5-3204-44a2-a4ee-d8d3c16f970e"
-#define DELSOL_LOCATION_SERVICE_UUID "61d33c70-e3cd-4b31-90d8-a6e14162fffd"
-#define DELSOL_NAVIGATION_SERVICE_UUID "77f5d2b5-efa1-4d55-b14a-cc92b72708a0"
-
-
-void PrintBytes( const std::string& byte_str )
-{
-    Serial.printf( "[%i]: ", byte_str.size() );
-    for( uint8_t c : byte_str )
-    {
-        if( c <= 0x0f )
-        {
-            Serial.print( "0" );
-        }
-        Serial.print( c, 16 );
-    }
-    Serial.println( "" );
-}
-
-
-bool deviceConnected = false;
-bool oldDeviceConnected = false;
-bool AuthenticationComplete = false;
 bool TrackNameDirty = false;
-BLEServer* pServer = nullptr;
-BLEAddress* iphone_address = nullptr;
-BLEClient* client = nullptr;
-BLESecurity Security{};
-
-class MyServerCallbacks : public BLEServerCallbacks
-{
-  public:
-    void onConnect( BLEServer* pServer, esp_ble_gatts_cb_param_t* param ) override
-    {
-        Serial.println( "onConnect CB" );
-        if( iphone_address )
-        {
-            delete iphone_address;
-            iphone_address = nullptr;
-        }
-        iphone_address = new BLEAddress( param->connect.remote_bda );
-
-        deviceConnected = true;
-    };
-
-    void onDisconnect( BLEServer* pServer ) override
-    {
-        Serial.println( "onDisconnect CB" );
-        deviceConnected = false;
-    }
-};
-
-class NotificationSecurityCallbacks : public BLESecurityCallbacks
-{
-    uint32_t onPassKeyRequest() override
-    {
-        Serial.println( "PassKeyRequest" );
-        return 123456;
-    }
-    void onPassKeyNotify( uint32_t pass_key ) override
-    {
-        Serial.printf( "On passkey Notify number:%d\n", pass_key );
-    }
-
-    bool onSecurityRequest() override
-    {
-        Serial.println( "On Security Request" );
-        return true;
-    }
-
-    bool onConfirmPIN( unsigned int ) override
-    {
-        Serial.println( "On Confirmed Pin Request" );
-        return true;
-    }
-
-    void onAuthenticationComplete( esp_ble_auth_cmpl_t cmpl ) override
-    {
-        if( cmpl.success )
-        {
-            Serial.println( "Authentication Successful!" );
-            uint16_t length;
-            esp_ble_gap_get_whitelist_size( &length );
-            Serial.printf( "size: %d\n", length );
-            AuthenticationComplete = true;
-        }
-        else
-        {
-            Serial.println( "Authentication failed" );
-        }
-    }
-};
-
+bool NeverConnected = true;
 
 void setup()
 {
@@ -123,105 +21,105 @@ void setup()
 
     Display::Begin();
 
-    BLEDevice::init( "Del Sol" );
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks( new MyServerCallbacks() );
+    Bluetooth::Begin();
 
-    auto vechicle_service = pServer->createService( DELSOL_VEHICLE_SERVICE_UUID );
-    auto vehicle_status_characteristic = vechicle_service->createCharacteristic(
-        DELSOL_STATUS_CHARACTERISTIC_UUID,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY );
+    AppleMediaService::RegisterForNotifications( []() { TrackNameDirty = true; }, AppleMediaService::NotificationLevel::TrackTitleOnly );
 
-    int vehicle_status = 0xAA;
-    vehicle_status_characteristic->setValue( vehicle_status );
-    vechicle_service->start();
+    delay( 4000 ); // Keep OldSols logo on screen.
 
-
-    BLEDevice::setEncryptionLevel( ESP_BLE_SEC_ENCRYPT );
-    BLEDevice::setSecurityCallbacks( new NotificationSecurityCallbacks() );
-
-
-    BLEAdvertising* pAdvertising = pServer->getAdvertising();
-    pAdvertising->setAppearance( 0x03C1 );
-    pAdvertising->setScanResponse( true );
-    BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
-    oAdvertisementData.setFlags( 0x01 );
-    setServiceSolicitation( oAdvertisementData, BLEUUID( APPLE_SERVICE_UUID ) );
-    setServiceSolicitation( oAdvertisementData, BLEUUID( "7905F431-B5CE-4E99-A40F-4B1E122D00D0" ) );
-    pAdvertising->setAdvertisementData( oAdvertisementData );
-
-
-    Security.setAuthenticationMode( ESP_LE_AUTH_REQ_SC_BOND );
-    Security.setCapability( ESP_IO_CAP_OUT ); // This value changes between server and client. Is it needed?
-    Security.setInitEncryptionKey( ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK ); // not sure how this is used either.
-    pAdvertising->start();
+    Bluetooth::Service(); // service once to see if we're already connected!
+    if( !Bluetooth::IsConnected() )
+    {
+        // if we're still not connected, display the connection message. If we still have correct time stored in the RTC system, show time
+        // too.
+        Display::Clear();
+        bool is_time_set = Bluetooth::IsTimeSet();
+        if( is_time_set )
+        {
+            DrawCurrentTime();
+        }
+        Display::DrawDebugInfo( "Bluetooth Discoverable. Name: DelSolClock", !is_time_set );
+    }
 }
-
-BLERemoteCharacteristic* entity_update = nullptr;
 
 void loop()
 {
-    // put your main code here, to run repeatedly:
-    // disconnecting
-    if( !deviceConnected && oldDeviceConnected )
+    Bluetooth::Service();
+    auto car_status = CarIO::GetStatus();
+    if( NeverConnected && Bluetooth::IsConnected() )
     {
-        delay( 500 ); // give the bluetooth stack the chance to get things ready
-        if( client )
-        {
-            client->disconnect();
-            delete client;
-            client = nullptr;
-        }
-        AuthenticationComplete = false;
-        pServer->startAdvertising(); // restart advertising
-        Serial.println( "disconnected, restart advertising" );
-        oldDeviceConnected = deviceConnected;
+        NeverConnected = false;
     }
-    // connecting
-    else if( deviceConnected && !oldDeviceConnected )
+
+    if( NeverConnected && !Bluetooth::IsConnected() )
     {
-        // do stuff here on connecting
-        oldDeviceConnected = deviceConnected;
-        Serial.println( "connected!" );
-        HandleConnection();
-        Serial.println( "HandleConnection returned" );
-    }
-    else if( deviceConnected )
-    {
-        delay( 2000 );
-        Serial.print( "." );
-        auto car_status = CarIO::GetStatus();
-        CarIO::Print( car_status );
-        if( entity_update )
+        bool update = false;
+        bool is_time_set = Bluetooth::IsTimeSet();
+
+        tm time;
+        if( is_time_set && getLocalTime( &time, 100 ) )
         {
-            // auto val = entity_update->readValue();
-            // Serial.println( "reading value..." );
-            // Serial.println( val.c_str() );
-        }
-        if( TrackNameDirty )
-        {
-            TrackNameDirty = false;
-            const auto& media_info = AppleMediaService::GetMediaInformation();
-            if( !media_info.mTitle.empty() )
+            if( Display::GetState().mHours24 != time.tm_hour || Display::GetState().mMinutes != time.tm_min )
             {
-                media_info.dump();
+                update = true;
             }
         }
-        UpdateDisplay();
-    }
-    else
-    {
+
+
+        if( car_status.mLights != Display::GetState().mIconHeadlight )
+        {
+            update = true;
+        }
+        if( update )
+        {
+            Display::Clear();
+            Display::DrawIcon( Display::Icon::Headlight, car_status.mLights );
+            if( is_time_set )
+            {
+                DrawCurrentTime();
+            }
+            Display::DrawDebugInfo( "Bluetooth Discoverable. Name: DelSolClock", !is_time_set );
+        }
         delay( 100 );
+        return;
     }
+
+
+    Display::DisplayState new_state;
+    tm time;
+    if( Bluetooth::IsTimeSet() && getLocalTime( &time, 100 ) )
+    {
+        new_state.mHours24 = time.tm_hour;
+        new_state.mMinutes = time.tm_min;
+    }
+
+    // TODO: speed.
+    new_state.mSpead = 42;
+    new_state.mIconHeadlight = car_status.mLights;
+    new_state.mIconBluetooth = Bluetooth::IsConnected();
+
+    const auto& media_info = AppleMediaService::GetMediaInformation();
+    new_state.mIconShuffle = media_info.mShuffleMode != AppleMediaService::MediaInformation::ShuffleMode::Off;
+    new_state.mIconRepeat = media_info.mRepeatMode != AppleMediaService::MediaInformation::RepeatMode::Off;
+    if( media_info.mPlaybackState == AppleMediaService::MediaInformation::PlaybackState::Playing )
+    {
+        new_state.mMediaArtist = media_info.mArtist;
+        new_state.mMediaTitle = media_info.mTitle;
+    }
+    if( Display::GetState() != new_state )
+    {
+        Serial.println( "Display state different! Current:" );
+        Display::GetState().Dump();
+        Serial.println( "New:" );
+        new_state.Dump();
+        Serial.println( "" );
+        Display::DrawState( new_state );
+    }
+    delay( 100 );
 }
 
-void UpdateDisplay()
+void DrawCurrentTime()
 {
-    Display::Clear();
-    Display::DrawIcon( Display::Icon::Bluetooth, true );
-    Display::DrawIcon( Display::Icon::Headlight, true );
-    Display::DrawIcon( Display::Icon::Shuffle, true );
-    Display::DrawIcon( Display::Icon::Repeat, true );
     tm time;
     if( getLocalTime( &time, 100 ) )
     {
@@ -231,144 +129,4 @@ void UpdateDisplay()
     {
         Serial.println( "failed to get time" );
     }
-    /*
-    const auto& media_info = AppleMediaService::GetMediaInformation();
-    if( !media_info.mTitle.empty() && media_info.mPlaybackState == AppleMediaService::MediaInformation::PlaybackState::Playing )
-    {
-        Display::DrawMediaInfo( media_info );
-    }
-    */
-
-    auto car_status = CarIO::GetStatus();
-    Display::DrawDebugInfo( car_status.ToString() );
-
-    Display::DrawSpeed( 42.3 );
 }
-
-void setServiceSolicitation( BLEAdvertisementData& advertisementData, BLEUUID uuid )
-{
-    char cdata[ 2 ];
-    switch( uuid.bitSize() )
-    {
-    case 16:
-    {
-        // [Len] [0x14] [UUID16] data
-        cdata[ 0 ] = 3;
-        cdata[ 1 ] = ESP_BLE_AD_TYPE_SOL_SRV_UUID; // 0x14
-        advertisementData.addData( std::string( cdata, 2 ) + std::string( ( char* )&uuid.getNative()->uuid.uuid16, 2 ) );
-        break;
-    }
-
-    case 128:
-    {
-        // [Len] [0x15] [UUID128] data
-        cdata[ 0 ] = 17;
-        cdata[ 1 ] = ESP_BLE_AD_TYPE_128SOL_SRV_UUID; // 0x15
-        advertisementData.addData( std::string( cdata, 2 ) + std::string( ( char* )uuid.getNative()->uuid.uuid128, 16 ) );
-        break;
-    }
-
-    default:
-        return;
-    }
-}
-
-
-void HandleConnection()
-{
-    if( !iphone_address )
-        return;
-
-    client = BLEDevice::createClient();
-
-    Security.setAuthenticationMode( ESP_LE_AUTH_REQ_SC_BOND );
-    Security.setCapability( ESP_IO_CAP_IO );
-    Security.setRespEncryptionKey( ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK );
-    Serial.println( "set security details" );
-
-    if( !client->connect( *iphone_address ) )
-    {
-        Serial.println( "failed to connect" );
-        delete client;
-        client = nullptr;
-        return;
-    }
-    Serial.println( "connected using client!" );
-
-    Serial.print( "Waiting for authentication" );
-    while( !AuthenticationComplete && client->isConnected() )
-    {
-        Serial.print( "." );
-        delay( 100 );
-    }
-    Serial.println( "Authentication finished" );
-    delay( 100 );
-    if( !client->isConnected() )
-    {
-        Serial.println( "client disconnected during authentication." );
-        delete client;
-        client = nullptr;
-        return;
-    }
-
-    AppleMediaService::RegisterForNotifications( []() { TrackNameDirty = true; }, AppleMediaService::NotificationLevel::TrackTitleOnly );
-
-    if( !AppleMediaService::StartMediaService( client ) )
-    {
-        client->disconnect();
-        delete client;
-        client = nullptr;
-        Serial.println( "StartMediaService failed" );
-        return;
-    }
-
-    CurrentTimeService::CurrentTime time;
-    if( !CurrentTimeService::StartTimeService( client, &time ) )
-    {
-        Serial.println( "StartTimeService failed" );
-        return;
-    }
-    timeval new_time;
-    new_time.tv_sec = time.ToTimeT();
-    new_time.tv_usec = static_cast<long>( time.mSecondsFraction * 1000000 );
-    Serial.print( "Unix time stamp: " );
-    Serial.print( new_time.tv_sec );
-    Serial.print( ", usec: " );
-    Serial.println( new_time.tv_usec );
-    if( settimeofday( &new_time, nullptr ) != 0 )
-    {
-        Serial.println( "Error setting time of day" );
-    }
-
-    time.Dump();
-
-    if( !AppleNotifications::StartNotificationService( client ) )
-    {
-        Serial.println( "failed to start the notification service" );
-        return;
-    }
-    Serial.println( "Notification service started" );
-}
-
-/*
-Application Notes:
-
-Let's display the connection status on screen. (connected / not connected)
-Let's display the current song information if available. (playing)
-Let's display the current time, and update the current time at the beginning of every connection.
-
-Let's see if notifications include driving directions
-
-Let's make available a few flags - window, roof and trunk, interior lights voltage?, and ignition. battery voltage too.
-Let's expose the current GPS location
-
-Let's only attempt to connect when the ignition is on. let's disconnect when it's off, and go into sleep mode (turn off screen too)
-
-State machine:
-
-Is ignition on?
-- start or continue BT operation
-
-Is ignition off?
-- clean up or stop advertising BT.
-*/
