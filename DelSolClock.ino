@@ -5,18 +5,18 @@
 #include "pins.h"
 #include "CarIO.h"
 #include "Bluetooth.h"
+#include "Gps.h"
 #include <time.h>
 #include <sys/time.h>
-#include "driver/uart.h"
 #include <TinyGPSPlus.h>
 
 namespace
 {
     bool TrackNameDirty = false;
     bool NeverConnected = true;
-    constexpr uart_port_t GpsUartPort = UART_NUM_2;
-    QueueHandle_t GpsUartQueue;
-    TinyGPSPlus Gps;
+    uint32_t BootFinishedTimeMs = 0;
+
+    RTC_DATA_ATTR int BootCount = 0;
 }
 
 void setup()
@@ -26,7 +26,15 @@ void setup()
     Serial.begin( 115200 );
     Serial.println( "Del Sol Clock Booting" );
 
-    SetupGps();
+    // Increment boot number and print it every reboot
+    ++BootCount;
+    Serial.println( "Boot number: " + String( BootCount ) );
+
+    // Print the wakeup reason for ESP32
+    PrintWakeupReason();
+
+    Gps::Begin();
+    Gps::Wake();
 
     Display::Begin();
 
@@ -49,12 +57,27 @@ void setup()
         }
         Display::DrawDebugInfo( "Bluetooth Discoverable. Name: DelSolClock", !is_time_set );
     }
+    BootFinishedTimeMs = millis();
 }
+
 
 void loop()
 {
+    bool sleep = millis() - BootFinishedTimeMs > 5000;
+    if( sleep )
+    {
+        Serial.println( "going to sleep..." );
+        // let's try sleeping!!
+        Gps::Sleep();
+        Display::EnableSleep( sleep );
+        gpio_hold_en( static_cast<gpio_num_t>( Pin::TftLit ) ); // hold 0 while sleeping.
+        esp_sleep_enable_timer_wakeup( 5 * 1000000 );
+        Serial.flush();
+        delay( 5 );
+        esp_deep_sleep_start();
+    }
     Bluetooth::Service();
-    ServiceGps();
+    Gps::Service();
     auto car_status = CarIO::GetStatus();
     if( NeverConnected && Bluetooth::IsConnected() )
     {
@@ -103,9 +126,9 @@ void loop()
         new_state.mMinutes = time.tm_min;
     }
     // TODO: GPS updates quite a bit, we should consider hanving a seperate regional clear for this.
-    if( Gps.speed.isUpdated() )
+    if( Gps::GetGps()->speed.isUpdated() )
     {
-        new_state.mSpead = Gps.speed.mph();
+        new_state.mSpead = Gps::GetGps()->speed.mph();
         if( new_state.mSpead < 10 )
         {
             new_state.mSpead = 0;
@@ -123,7 +146,7 @@ void loop()
         new_state.mMediaArtist = media_info.mArtist;
         new_state.mMediaTitle = media_info.mTitle;
     }
-    if( Display::GetState() != new_state )
+    if( Display::GetState() != new_state && !sleep )
     {
         Serial.println( "Display state different! Current:" );
         Display::GetState().Dump();
@@ -148,51 +171,33 @@ void DrawCurrentTime()
     }
 }
 
-
-void SetupGps()
+/*
+Method to print the reason by which ESP32
+has been awaken from sleep
+*/
+void PrintWakeupReason()
 {
-    uart_config_t uart_config;
-    uart_config.baud_rate = 9600;
-    uart_config.data_bits = UART_DATA_8_BITS;
-    uart_config.parity = UART_PARITY_DISABLE;
-    uart_config.stop_bits = UART_STOP_BITS_1;
-    uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
-    uart_config.rx_flow_ctrl_thresh = 120;
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
-    uart_param_config( GpsUartPort, &uart_config );
-
-    uart_set_pin( GpsUartPort,
-                  Pin::GpsRx,         // TX
-                  Pin::GpsTx,         // RX
-                  UART_PIN_NO_CHANGE, // RTS
-                  UART_PIN_NO_CHANGE  // CTS
-    );
-
-    uart_driver_install( GpsUartPort, 2048, 2048, 10, &GpsUartQueue, 0 );
-}
-
-void ServiceGps()
-{
-    size_t count = 0;
-    uint8_t data[ 128 ];
-    uart_get_buffered_data_len( GpsUartPort, &count );
-    if( count > 0 )
+    switch( wakeup_reason )
     {
-        while( count > 0 )
-        {
-            auto read = uart_read_bytes( GpsUartPort, data, min( count, sizeof( data ) ), 100 );
-            for( int i = 0; i < read; ++i )
-            {
-                Gps.encode( static_cast<char>( data[ i ] ) );
-            }
-            count -= read;
-        }
-    }
-
-    if( Gps.location.isUpdated() )
-    {
-        float lat = Gps.location.lat();
-        float lng = Gps.location.lng();
-        Serial.printf( "GPS: %f, %f\n", lat, lng );
+    case ESP_SLEEP_WAKEUP_EXT0:
+        Serial.println( "Wakeup caused by external signal using RTC_IO" );
+        break;
+    case ESP_SLEEP_WAKEUP_EXT1:
+        Serial.println( "Wakeup caused by external signal using RTC_CNTL" );
+        break;
+    case ESP_SLEEP_WAKEUP_TIMER:
+        Serial.println( "Wakeup caused by timer" );
+        break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD:
+        Serial.println( "Wakeup caused by touchpad" );
+        break;
+    case ESP_SLEEP_WAKEUP_ULP:
+        Serial.println( "Wakeup caused by ULP program" );
+        break;
+    default:
+        Serial.printf( "Wakeup was not caused by deep sleep: %d\n", wakeup_reason );
+        break;
     }
 }
