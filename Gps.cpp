@@ -51,11 +51,9 @@ namespace Gps
                 for( int i = 0; i < read; ++i )
                 {
                     Gps.encode( static_cast<char>( data[ i ] ) );
-                    Serial.print( static_cast<char>( data[ i ] ) );
                 }
                 count -= read;
             }
-            Serial.println( "" );
         }
 
         if( Gps.location.isUpdated() )
@@ -68,23 +66,11 @@ namespace Gps
     void Wake()
     {
         auto bytes_pushed = uart_write_bytes( GpsUartPort, WakeCommand, sizeof( WakeCommand ) - 1 );
-        Serial.printf( "bytes written: %i\n", bytes_pushed );
-
-        if( uart_wait_tx_done( GpsUartPort, 100 ) != ESP_OK )
-        {
-            Serial.println( "error waiting for TX" );
-        }
-        Serial.println( "GPS wake done" );
+        uart_wait_tx_done( GpsUartPort, 100 );
     }
     void Sleep()
     {
         auto bytes_pushed = uart_write_bytes( GpsUartPort, StandbyCommand, sizeof( StandbyCommand ) - 1 );
-        Serial.printf( "bytes written: %i\n", bytes_pushed );
-
-        if( uart_wait_tx_done( GpsUartPort, 100 ) != ESP_OK )
-        {
-            Serial.println( "error waiting for TX" );
-        }
-        Serial.println( "GPS standby done" );
+        uart_wait_tx_done( GpsUartPort, 100 );
     }
 }

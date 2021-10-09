@@ -23,4 +23,8 @@ namespace CarIO
 
     void SetTftBrightness( int brightness ); // 0 to 255;
 
+    void StartBeeper( int pulse_count, int pitch_hz, int pulse_duration_ms, int pulse_period_ms, int group_period_ms );
+    void StopBeeper();
+    void Service();
+
 }

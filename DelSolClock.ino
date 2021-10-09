@@ -12,35 +12,36 @@
 
 namespace
 {
-    bool TrackNameDirty = false;
     bool NeverConnected = true;
-    uint32_t BootFinishedTimeMs = 0;
-
-    RTC_DATA_ATTR int BootCount = 0;
+    bool LightsAlarmActive = false;
 }
 
 void setup()
 {
-    CarIO::Setup();
-
     Serial.begin( 115200 );
     Serial.println( "Del Sol Clock Booting" );
 
-    // Increment boot number and print it every reboot
-    ++BootCount;
-    Serial.println( "Boot number: " + String( BootCount ) );
-
-    // Print the wakeup reason for ESP32
-    PrintWakeupReason();
-
-    Gps::Begin();
-    Gps::Wake();
-
+    // Required before we can handle the lights-only power mode.
+    CarIO::Setup();
     Display::Begin();
+    Gps::Begin();
 
+
+    // go back to sleep if the car is off, or go into the alarm mode if the lights are on.
+    HandlePowerState( CarIO::GetStatus() );
+
+    // if the ignition is off, we wait until it's on, or we go to sleep.
+    while( LightsAlarmActive )
+    {
+        // delay( 10 );
+        HandlePowerState( CarIO::GetStatus() );
+        CarIO::Service();
+    }
+
+    Display::DrawSplash();
+
+    Gps::Wake();
     Bluetooth::Begin();
-
-    AppleMediaService::RegisterForNotifications( []() { TrackNameDirty = true; }, AppleMediaService::NotificationLevel::TrackTitleOnly );
 
     delay( 4000 ); // Keep OldSols logo on screen.
 
@@ -57,28 +58,71 @@ void setup()
         }
         Display::DrawDebugInfo( "Bluetooth Discoverable. Name: DelSolClock", !is_time_set );
     }
-    BootFinishedTimeMs = millis();
+}
+
+void HandlePowerState( const CarIO::CarStatus& car_status )
+{
+    // if IGN and Illumination are off, go to sleep.
+    if( !car_status.mIgnition && !car_status.mLights )
+    {
+        Serial.println( "Ignition and lights are off. Going to sleep." );
+        Sleep();
+        return;
+    }
+
+    // If IGN is gone but Illumination is ON, display lights alarm.
+    if( !car_status.mIgnition && car_status.mLights )
+    {
+        if( !LightsAlarmActive )
+        {
+            Serial.println( "Ignition is off, but Lights are on. Alarm" );
+            LightsAlarmActive = true;
+            Display::Clear();
+            // Display::DrawDebugInfo( "LIGHTS ON", true );
+            Display::DrawLightAlarm();
+            CarIO::StartBeeper( 4, 493, 50, 125, 3000 );
+        }
+        return;
+    }
+
+    // If IGN is present, return to normal behavior.
+    if( car_status.mIgnition )
+    {
+        if( LightsAlarmActive )
+        {
+            Serial.println( "Ignition on, turning off the lights alarm." );
+            LightsAlarmActive = false;
+            CarIO::StopBeeper();
+        }
+    }
+}
+
+void Sleep()
+{
+    Serial.println( "going to sleep..." );
+    // let's try sleeping!!
+    Gps::Sleep();
+    Display::EnableSleep( sleep );
+    gpio_hold_en( static_cast<gpio_num_t>( Pin::TftLit ) ); // hold 0 while sleeping.
+    esp_sleep_enable_ext1_wakeup( ( 1ull << Pin::Ignition ) | ( 1ull << Pin::Illumination ), ESP_EXT1_WAKEUP_ANY_HIGH );
+    Serial.flush();
+    delay( 5 );
+    esp_deep_sleep_start();
 }
 
 
 void loop()
 {
-    bool sleep = millis() - BootFinishedTimeMs > 5000;
-    if( sleep )
-    {
-        Serial.println( "going to sleep..." );
-        // let's try sleeping!!
-        Gps::Sleep();
-        Display::EnableSleep( sleep );
-        gpio_hold_en( static_cast<gpio_num_t>( Pin::TftLit ) ); // hold 0 while sleeping.
-        esp_sleep_enable_timer_wakeup( 5 * 1000000 );
-        Serial.flush();
-        delay( 5 );
-        esp_deep_sleep_start();
-    }
     Bluetooth::Service();
     Gps::Service();
+    CarIO::Service();
     auto car_status = CarIO::GetStatus();
+    HandlePowerState( car_status );
+    if( LightsAlarmActive )
+    {
+        return;
+    }
+
     if( NeverConnected && Bluetooth::IsConnected() )
     {
         NeverConnected = false;
@@ -146,7 +190,7 @@ void loop()
         new_state.mMediaArtist = media_info.mArtist;
         new_state.mMediaTitle = media_info.mTitle;
     }
-    if( Display::GetState() != new_state && !sleep )
+    if( Display::GetState() != new_state )
     {
         Serial.println( "Display state different! Current:" );
         Display::GetState().Dump();
@@ -168,36 +212,5 @@ void DrawCurrentTime()
     else
     {
         Serial.println( "failed to get time" );
-    }
-}
-
-/*
-Method to print the reason by which ESP32
-has been awaken from sleep
-*/
-void PrintWakeupReason()
-{
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-    switch( wakeup_reason )
-    {
-    case ESP_SLEEP_WAKEUP_EXT0:
-        Serial.println( "Wakeup caused by external signal using RTC_IO" );
-        break;
-    case ESP_SLEEP_WAKEUP_EXT1:
-        Serial.println( "Wakeup caused by external signal using RTC_CNTL" );
-        break;
-    case ESP_SLEEP_WAKEUP_TIMER:
-        Serial.println( "Wakeup caused by timer" );
-        break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD:
-        Serial.println( "Wakeup caused by touchpad" );
-        break;
-    case ESP_SLEEP_WAKEUP_ULP:
-        Serial.println( "Wakeup caused by ULP program" );
-        break;
-    default:
-        Serial.printf( "Wakeup was not caused by deep sleep: %d\n", wakeup_reason );
-        break;
     }
 }

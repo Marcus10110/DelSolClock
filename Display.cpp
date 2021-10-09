@@ -180,12 +180,31 @@ namespace Display
             Serial.println( "SPIFFS failed" );
             return;
         }
+    }
+
+    void DrawSplash()
+    {
         reader.drawBMP( "/OldSols.bmp", gDisplay, 0, 0 );
+    }
+
+    void DrawLightAlarm()
+    {
+        reader.drawBMP( "/light_large.bmp", gDisplay, 68, 16 ); // 104x104
+        gDisplay.setTextColor( DefaultTextColor );
+        gDisplay.setTextSize( 2 );
+        int16_t x, y;
+        const char* str = "LIGHTS ON";
+        GetTextLocation( str, HorizontalAlignment::Center, VerticalAlignment::Bottom, &x, &y );
+        gDisplay.setCursor( x, y );
+        gDisplay.print( str );
+        gDisplay.setTextSize( NormalFontSize );
     }
 
     void Clear()
     {
         gDisplay.fillScreen( DefaultBackgroundColor );
+        // reset the state.
+        State = DisplayState{};
     }
 
     void DrawTime( uint8_t hours24, uint8_t minutes )

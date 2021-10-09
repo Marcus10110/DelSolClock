@@ -32,6 +32,8 @@ namespace Display
     };
 
     void Begin();
+    void DrawSplash();
+    void DrawLightAlarm();
     void Clear();
     void DrawTime( uint8_t hours24, uint8_t minutes );
     void DrawSpeed( float speed );

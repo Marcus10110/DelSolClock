@@ -9,6 +9,15 @@ namespace CarIO
         constexpr uint8_t TftBacklightPwmChannel = 0;
         constexpr uint8_t BuzzerPwmChannel = 1;
         bool TftPwmAttached = false;
+        uint32_t BeeperStartMs = 0;
+        bool BeeperActive = false;
+        bool ToneActive = false;
+
+        int PulseCount;
+        int PitchHz;
+        int PulseDurationMs;
+        int PulsePeriodMs;
+        int GroupPeriodMs;
     }
     std::string CarStatus::ToString()
     {
@@ -32,13 +41,13 @@ namespace CarIO
         pinMode( Pin::Buzzer, OUTPUT );
 
         ledcSetup( TftBacklightPwmChannel, 5000, 8 ); // channel 0, 5 khz, 8 bit resolution
-        ledcSetup( BuzzerPwmChannel, 440, 8 );        // channel 1, 5 khz, 8 bit resolution
+        ledcSetup( BuzzerPwmChannel, 440, 8 );        // channel 1, 440 hz, 8 bit resolution
         ledcAttachPin( Pin::TftLit, TftBacklightPwmChannel );
         TftPwmAttached = true;
         ledcAttachPin( Pin::Buzzer, BuzzerPwmChannel );
 
         ledcWrite( TftBacklightPwmChannel, 255 );
-        // ledcWrite( BuzzerPwmChannel, 128 );
+        ledcWrite( BuzzerPwmChannel, 0 );
 
         // set the ADC range to 0 to 800mV
         // analogSetAttenuation( ADC_0db );
@@ -49,6 +58,7 @@ namespace CarIO
         CarStatus status;
         int battery_code = analogRead( Pin::Battery );
         int illumination_code = analogRead( Pin::Illumination );
+        pinMode( Pin::Illumination, INPUT ); // required to put the pin back into digital mode.
         // Volts Per Code (Oct 2 2021) 0.0202547273
         status.mBatteryVoltage = battery_code * 0.0202547273f;
         // volts per code (oct 2 2021) 0.003800545407
@@ -89,6 +99,56 @@ namespace CarIO
             ledcDetachPin( Pin::TftLit );
             TftPwmAttached = false;
             digitalWrite( Pin::TftLit, 0 ); // drive low.
+        }
+    }
+
+    void StartBeeper( int pulse_count, int pitch_hz, int pulse_duration_ms, int pulse_period_ms, int group_period_ms )
+    {
+        PulseCount = pulse_count;
+        PitchHz = pitch_hz;
+        PulseDurationMs = pulse_duration_ms;
+        PulsePeriodMs = pulse_period_ms;
+        GroupPeriodMs = group_period_ms;
+        BeeperActive = true;
+        ToneActive = false;
+        ledcSetup( BuzzerPwmChannel, pitch_hz, 8 );
+        ledcWrite( BuzzerPwmChannel, 0 );
+        BeeperStartMs = millis();
+    }
+    void StopBeeper()
+    {
+        BeeperActive = false;
+        ToneActive = false;
+        ledcWrite( BuzzerPwmChannel, 0 );
+    }
+
+    void Service()
+    {
+        if( BeeperActive )
+        {
+            uint32_t elapsed_ms = millis() - BeeperStartMs;
+            // determine if the tone should be on.
+            elapsed_ms %= GroupPeriodMs;
+            bool tone_on = false;
+            if( elapsed_ms < ( PulsePeriodMs * PulseCount ) )
+            {
+                elapsed_ms %= PulsePeriodMs;
+                if( elapsed_ms <= PulseDurationMs )
+                {
+                    tone_on = true;
+                }
+            }
+
+            if( tone_on && !ToneActive )
+            {
+                ledcWrite( BuzzerPwmChannel, 128 );
+                ToneActive = true;
+            }
+            else if( !tone_on && ToneActive )
+            {
+                ledcWrite( BuzzerPwmChannel, 0 );
+                ToneActive = false;
+            }
         }
     }
 }
