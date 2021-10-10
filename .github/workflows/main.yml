@@ -7,7 +7,7 @@ on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
     branches: [master]
-    tags: ["*"]
+    tags: ["v*.*.*"]
   pull_request:
     branches: [master]
 
@@ -33,12 +33,6 @@ jobs:
       # Runs a set of commands using the runners shell
       - name: Build
         run: ci/build.sh
-      # Store results as an artifact.
-      - name: Store Output
-        uses: actions/upload-artifact@v2
-        with:
-          name: mso-firmware
-          path: output/*
       # publish tags as releases.
       - name: Release
         uses: softprops/action-gh-release@v1
