@@ -39,7 +39,7 @@ namespace Display
     void DrawSpeed( float speed );
     void DrawIcon( Icon icon, bool visible );
     void DrawMediaInfo( const std::string& title, const std::string& artist );
-    void DrawDebugInfo( const std::string& message, bool center );
+    void DrawDebugInfo( const std::string& message, bool center, bool fine_print );
     void EnableSleep( bool sleep );
     const DisplayState& GetState();
     void DrawState( const DisplayState& state );

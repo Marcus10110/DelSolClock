@@ -10,6 +10,8 @@
 
 #include <time.h>
 #include <sys/time.h>
+#include <esp_bt_device.h>
+#include <esp_gap_ble_api.h>
 
 #include "AppleMediaService.h"
 #include "CurrentTimeService.h"
@@ -19,7 +21,7 @@
 
 #define DELSOL_VEHICLE_SERVICE_UUID "8fb88487-73cf-4cce-b495-505a4b54b802"
 #define DELSOL_STATUS_CHARACTERISTIC_UUID "40d527f5-3204-44a2-a4ee-d8d3c16f970e"
-#define DELSOL_BETTERY_CHARACTERISTIC_UUID "40d527f5-3204-44a2-a4ee-d8d3c16f970e"
+#define DELSOL_BATTERY_CHARACTERISTIC_UUID "5c258bb8-91fc-43bb-8944-b83d0edc9b43"
 #define DELSOL_LOCATION_SERVICE_UUID "61d33c70-e3cd-4b31-90d8-a6e14162fffd"
 #define DELSOL_NAVIGATION_SERVICE_UUID "77f5d2b5-efa1-4d55-b14a-cc92b72708a0"
 
@@ -35,6 +37,7 @@ namespace Bluetooth
         BLEAddress* IPhoneAddress = nullptr;
         BLEClient* Client = nullptr;
         BLESecurity Security{};
+        BLECharacteristic* VehicleStatusCharacteristic = nullptr;
 
         RTC_DATA_ATTR bool TimeSet = false;
 
@@ -230,14 +233,45 @@ namespace Bluetooth
         Server = BLEDevice::createServer();
         Server->setCallbacks( new GetAddressServerCallbacks() );
 
+        const uint8_t* address = esp_bt_dev_get_address();
+        if( address )
+        {
+            Serial.print( "public device address: " );
+            for( int i = 0; i < 6; ++i )
+            {
+                Serial.print( address[ i ], HEX );
+            }
+            Serial.println( "" );
+        }
+        else
+        {
+            Serial.println( "device address null" );
+        }
+
+        esp_bd_addr_t local_address;
+        uint8_t address_type;
+        if( esp_ble_gap_get_local_used_addr( local_address, &address_type ) == ESP_OK )
+        {
+            Serial.print( "local device address: " );
+            for( int i = 0; i < 6; ++i )
+            {
+                Serial.print( local_address[ i ], HEX );
+            }
+            Serial.println( "" );
+            Serial.printf( "local address type: %u\n", address_type );
+        }
+        else
+        {
+            Serial.println( "failed to get local address" );
+        }
+
 
         auto vechicle_service = Server->createService( DELSOL_VEHICLE_SERVICE_UUID );
-        auto vehicle_status_characteristic = vechicle_service->createCharacteristic(
+        VehicleStatusCharacteristic = vechicle_service->createCharacteristic(
             DELSOL_STATUS_CHARACTERISTIC_UUID,
             BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY );
-
-        int vehicle_status = 0xAA;
-        vehicle_status_characteristic->setValue( vehicle_status );
+        VehicleStatusCharacteristic->addDescriptor( new BLE2902() );
+        VehicleStatusCharacteristic->setValue( "" );
         vechicle_service->start();
 
 
@@ -248,11 +282,23 @@ namespace Bluetooth
         BLEAdvertising* advertising = Server->getAdvertising();
         advertising->setAppearance( 0x03C1 );
         advertising->setScanResponse( true );
+
         BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
+        BLEAdvertisementData scan_response_data;
+        scan_response_data.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
         oAdvertisementData.setFlags( 0x01 );
+        // advertise the vehicle service.
+        // oAdvertisementData.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
+        // Apple Media Service
         setServiceSolicitation( oAdvertisementData, BLEUUID( APPLE_SERVICE_UUID ) );
-        setServiceSolicitation( oAdvertisementData, BLEUUID( "7905F431-B5CE-4E99-A40F-4B1E122D00D0" ) );
+        // Apple Notification Service ANCS
+        // setServiceSolicitation( oAdvertisementData, BLEUUID( "7905F431-B5CE-4E99-A40F-4B1E122D00D0" ) );
+        auto before = oAdvertisementData.getPayload().size();
+        oAdvertisementData.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
+        auto after = oAdvertisementData.getPayload().size();
+        Serial.printf( "advertising size before %i, after %i\n", before, after );
         advertising->setAdvertisementData( oAdvertisementData );
+        advertising->setScanResponseData( scan_response_data );
 
         // TODO: Figure out what this does, and why we set it twice.
         Security.setAuthenticationMode( ESP_LE_AUTH_REQ_SC_BOND );
@@ -271,6 +317,7 @@ namespace Bluetooth
         }
         DeviceConnected = false;
         OldDeviceConnected = false;
+        VehicleStatusCharacteristic = nullptr;
         if( Server )
         {
             auto advertising = Server->getAdvertising();
@@ -331,5 +378,15 @@ namespace Bluetooth
     bool IsTimeSet()
     {
         return TimeSet;
+    }
+
+    void SetVehicleStatus( const std::string& status )
+    {
+        if( VehicleStatusCharacteristic )
+        {
+            VehicleStatusCharacteristic->setValue( status );
+            VehicleStatusCharacteristic->notify();
+            Serial.println( "set characteristic notify." );
+        }
     }
 }

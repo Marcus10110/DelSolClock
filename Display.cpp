@@ -184,6 +184,7 @@ namespace Display
 
     void DrawSplash()
     {
+        Clear();
         reader.drawBMP( "/OldSols.bmp", gDisplay, 0, 0 );
     }
 
@@ -331,9 +332,12 @@ namespace Display
         gDisplay.setTextWrap( true );
     }
 
-    void DrawDebugInfo( const std::string& message, bool center )
+    void DrawDebugInfo( const std::string& message, bool center, bool fine_print )
     {
-        gDisplay.setFont( nullptr );
+        if( fine_print )
+        {
+            gDisplay.setFont( nullptr );
+        }
         gDisplay.setTextColor( DefaultTextColor );
         int16_t x, y;
         auto str = message.c_str();

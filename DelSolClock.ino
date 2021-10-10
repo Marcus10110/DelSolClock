@@ -14,6 +14,7 @@ namespace
 {
     bool NeverConnected = true;
     bool LightsAlarmActive = false;
+    std::string StatusCharacteristicValue = "";
 }
 
 void setup()
@@ -56,7 +57,7 @@ void setup()
         {
             DrawCurrentTime();
         }
-        Display::DrawDebugInfo( "Bluetooth Discoverable. Name: DelSolClock", !is_time_set );
+        Display::DrawDebugInfo( "Bluetooth Discoverable.\nName: DelSolClock", !is_time_set, false );
     }
 }
 
@@ -78,7 +79,6 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
             Serial.println( "Ignition is off, but Lights are on. Alarm" );
             LightsAlarmActive = true;
             Display::Clear();
-            // Display::DrawDebugInfo( "LIGHTS ON", true );
             Display::DrawLightAlarm();
             CarIO::StartBeeper( 4, 493, 50, 125, 3000 );
         }
@@ -100,7 +100,6 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
 void Sleep()
 {
     Serial.println( "going to sleep..." );
-    // let's try sleeping!!
     Gps::Sleep();
     Display::EnableSleep( sleep );
     gpio_hold_en( static_cast<gpio_num_t>( Pin::TftLit ) ); // hold 0 while sleeping.
@@ -108,6 +107,20 @@ void Sleep()
     Serial.flush();
     delay( 5 );
     esp_deep_sleep_start();
+}
+
+void HandleStatusUpdate( const CarIO::CarStatus& car_status )
+{
+    // StatusCharacteristicValue
+    char update[ 128 ] = { 0 };
+    snprintf( update, sizeof( update ), "%i,%i,%i,%i,%i", car_status.mRearWindow, car_status.mTrunk, car_status.mRoof, car_status.mIgnition,
+              car_status.mLights );
+    if( strcmp( update, StatusCharacteristicValue.c_str() ) != 0 )
+    {
+        StatusCharacteristicValue = update;
+        Serial.printf( "updating BLE characteristic with %s\n", StatusCharacteristicValue.c_str() );
+        Bluetooth::SetVehicleStatus( StatusCharacteristicValue );
+    }
 }
 
 
@@ -118,6 +131,7 @@ void loop()
     CarIO::Service();
     auto car_status = CarIO::GetStatus();
     HandlePowerState( car_status );
+    HandleStatusUpdate( car_status );
     if( LightsAlarmActive )
     {
         return;
@@ -155,7 +169,7 @@ void loop()
             {
                 DrawCurrentTime();
             }
-            Display::DrawDebugInfo( "Bluetooth Discoverable. Name: DelSolClock", !is_time_set );
+            Display::DrawDebugInfo( "Bluetooth On\n  Name: \"Del Sol\"", !is_time_set, false );
         }
         delay( 100 );
         return;
