@@ -85,7 +85,9 @@ namespace DelSolClockApp.Services
 				var ask_result = await ble_permissions_service.RequestPermissionAsync();
 				if (ask_result != PermissionStatus.Granted)
 				{
-					throw new BluetoothDeniedException();
+					Logger.WriteLine("Bluetooth not allowed");
+					Active = false;
+					return;
 				}
 			}
 
@@ -136,13 +138,13 @@ namespace DelSolClockApp.Services
 
 			if (DelSolDevice != null && DelSolDevice.State == Plugin.BLE.Abstractions.DeviceState.Disconnected)
 			{
-				Debug.WriteLine("known device no longer connected. clearing.");
+				Logger.WriteLine("known device no longer connected. clearing.");
 				CleanupDevice();
 			}
 
 			if (DelSolDevice != null)
 			{
-				Debug.WriteLine($"known device looks valid. nothing to do: {DelSolDevice.State}");
+				Logger.WriteLine($"known device looks valid. nothing to do: {DelSolDevice.State}");
 				return;
 			}
 
@@ -157,12 +159,12 @@ namespace DelSolClockApp.Services
 					{
 						try
 						{
-							Debug.WriteLine($"connecting to {DelSolDevice.Name}");
+							Logger.WriteLine($"connecting to {DelSolDevice.Name}");
 							await CrossBluetoothLE.Current.Adapter.ConnectToDeviceAsync(DelSolDevice);
 						}
 						catch (Exception ex)
 						{
-							Debug.WriteLine($"failed to connect to device: {ex.Message}");
+							Logger.WriteLine($"failed to connect to device: {ex.Message}");
 							return;
 						}
 					}
@@ -170,7 +172,7 @@ namespace DelSolClockApp.Services
 					{
 						throw new Exception("device should be connected here.");
 					}
-					Debug.WriteLine($"Del Sol connected. {DelSolDevice.Name}, {DelSolDevice.State}");
+					Logger.WriteLine($"Del Sol connected. {DelSolDevice.Name}, {DelSolDevice.State}");
 					var vehicle_service = await DelSolDevice.GetServiceAsync(DelSolVehicleServiceGuid);
 					if (vehicle_service == null)
 					{
@@ -183,7 +185,7 @@ namespace DelSolClockApp.Services
 					}
 					StatusCharacteristic.ValueUpdated += Status_characteristic_ValueUpdated;
 					await StatusCharacteristic.StartUpdatesAsync();
-					Debug.WriteLine($"Initial Status: {System.Text.Encoding.Default.GetString(StatusCharacteristic.Value)}");
+					Logger.WriteLine($"Initial Status: {System.Text.Encoding.Default.GetString(StatusCharacteristic.Value)}");
 					Connected?.Invoke(this, new EventArgs());
 					StatusChangedEventArgs args = new StatusChangedEventArgs();
 					args.Status = ParseStatus(StatusCharacteristic.Value);
@@ -191,12 +193,12 @@ namespace DelSolClockApp.Services
 				}
 				catch (Exception ex)
 				{
-					Debug.WriteLine($"Error probing device. {ex.Message}");
+					Logger.WriteLine($"Error probing device. {ex.Message}");
 				}
 			}
 			else
 			{
-				Debug.WriteLine("device not found");
+				Logger.WriteLine("device not found");
 			}
 		}
 
@@ -242,7 +244,7 @@ namespace DelSolClockApp.Services
 
 		private void Status_characteristic_ValueUpdated(object sender, Plugin.BLE.Abstractions.EventArgs.CharacteristicUpdatedEventArgs e)
 		{
-			Debug.WriteLine($"Status update: {e.Characteristic.Value}");
+			Logger.WriteLine($"Status update: {e.Characteristic.Value}");
 			StatusChangedEventArgs args = new StatusChangedEventArgs();
 			args.Status = ParseStatus(e.Characteristic.Value);
 			StatusChanged?.Invoke(this, args);
@@ -263,7 +265,7 @@ namespace DelSolClockApp.Services
 		{
 			if (e.Device == DelSolDevice)
 			{
-				Debug.WriteLine($"DelSol device lost");
+				Logger.WriteLine($"DelSol device lost");
 				CleanupDevice();
 				Disconnected(this, new EventArgs());
 				StartConnectionTimer();
@@ -274,7 +276,7 @@ namespace DelSolClockApp.Services
 		{
 			if (e.Device == DelSolDevice)
 			{
-				Debug.WriteLine($"device disconnected: {e.Device.Name}");
+				Logger.WriteLine($"device disconnected: {e.Device.Name}");
 				CleanupDevice();
 				Disconnected(this, new EventArgs());
 				StartConnectionTimer();
@@ -283,12 +285,12 @@ namespace DelSolClockApp.Services
 
 		private void Adapter_DeviceConnected(object sender, Plugin.BLE.Abstractions.EventArgs.DeviceEventArgs e)
 		{
-			Debug.WriteLine($"device connected: {e.Device.Name}");
+			Logger.WriteLine($"device connected: {e.Device.Name}");
 		}
 
 		private void Ble_StateChanged(object sender, Plugin.BLE.Abstractions.EventArgs.BluetoothStateChangedArgs e)
 		{
-			Debug.WriteLine($"BLE State Changed. {e.OldState} -> {e.NewState}");
+			Logger.WriteLine($"BLE State Changed. {e.OldState} -> {e.NewState}");
 		}
 	}
 }

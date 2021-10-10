@@ -13,24 +13,26 @@ namespace DelSolClockApp
 		public App()
 		{
 			InitializeComponent();
-
+			DelSol = new DelSolConnection();
 			DependencyService.Register<MockDataStore>();
 			MainPage = new AppShell();
 		}
 
 		protected override void OnStart()
 		{
-			DelSol = new DelSolConnection();
+			Logger.WriteLine("App OnStart");
 			DelSol.Begin();
 		}
 
 		protected override void OnSleep()
 		{
+			Logger.WriteLine("App OnSleep");
 			DelSol.End();
 		}
 
 		protected override void OnResume()
 		{
+			Logger.WriteLine("App OnResume");
 			DelSol.Begin();
 		}
 	}

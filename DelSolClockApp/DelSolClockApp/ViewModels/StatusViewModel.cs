@@ -1,4 +1,5 @@
 ﻿using DelSolClockApp.Models;
+using DelSolClockApp.Services;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -36,11 +37,13 @@ namespace DelSolClockApp.ViewModels
 			var app = App.Current as App;
 			if (app == null)
 			{
+				Logger.WriteLine("App is null");
 				throw new Exception("app not available");
 			}
 			var del_sol = app.DelSol;
 			if (del_sol == null)
 			{
+				Logger.WriteLine("Del Sol is Null");
 				throw new Exception("del sol not available");
 			}
 

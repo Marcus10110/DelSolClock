@@ -45,29 +45,6 @@
                         Command="{Binding OpenWebCommand}"
                         BackgroundColor="{StaticResource Primary}"
                         TextColor="White" />
-                <Button Margin="0,10,0,0" Text="Test"
-                        Command="{Binding TestCommand}"
-                        BackgroundColor="{StaticResource Primary}"
-                        TextColor="White" />
-                <Button Margin="0,10,0,0" Text="Recheck"
-                        Command="{Binding RecheckCommand}"
-                        BackgroundColor="{StaticResource Primary}"
-                        TextColor="White" />
-                <Button Margin="0,10,0,0" Text="Run"
-                        Command="{Binding RunCommand}"
-                        BackgroundColor="{StaticResource Primary}"
-                        TextColor="White" />
-                <Button Margin="0,10,0,0" Text="Stop"
-                        Command="{Binding StopCommand}"
-                        BackgroundColor="{StaticResource Primary}"
-                        TextColor="White" />
-                <CollectionView x:Name="LogsListView" ItemsSource="{Binding Logs}">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Label Text="{Binding}" />
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
             </StackLayout>
         </ScrollView>
     </Grid>

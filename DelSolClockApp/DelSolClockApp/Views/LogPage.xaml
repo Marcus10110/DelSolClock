@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:DelSolClockApp.ViewModels"
+             x:Class="DelSolClockApp.Views.LogPage"
+             Title="{Binding Title}">
+
+    <ContentPage.BindingContext>
+        <vm:LogViewModel />
+    </ContentPage.BindingContext>
+
+    <ContentPage.Content>
+        <StackLayout>
+            <Label Text="Del Sol App Logs" HorizontalOptions="CenterAndExpand" />
+            <CollectionView x:Name="LogsListView" ItemsSource="{Binding Logs}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Label Padding="3" FontSize="12" Text="{Binding}" />
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </StackLayout>
+    </ContentPage.Content>
+</ContentPage>
