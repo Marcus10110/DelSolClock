@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DelSolClockApp.Views.StatusPage"
+             xmlns:vm="clr-namespace:DelSolClockApp.ViewModels"
+             xmlns:local="clr-namespace:DelSolClockApp"
+             xmlns:model="clr-namespace:DelSolClockApp.Models"  
+             Title="{Binding Title}">
+    <ContentPage.BindingContext>
+        <vm:StatusViewModel />
+    </ContentPage.BindingContext>
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <local:CarStatusConverter x:Key="carStatusToList" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ContentPage.Content>
+        <ScrollView>
+            <StackLayout>
+                <StackLayout Padding="10" Orientation="Horizontal">
+                    <Label Text="Del Sol Clock Status" FontSize="16" />
+                    <Label Text="{Binding Connected}" FontSize="16" HorizontalOptions="EndAndExpand" >
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding Connected}" Value="false">
+                                <Setter Property="Text" Value="Disconnected" />
+                            </DataTrigger>
+                            <DataTrigger TargetType="Label" Binding="{Binding Connected}" Value="true">
+                                <Setter Property="Text" Value="Connected" />
+                                <Setter Property="TextColor" Value="LightGreen"/>
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                </StackLayout>
+                <CollectionView x:Name="ItemsListView"
+                ItemsSource="{Binding CarStatus, Converter={StaticResource carStatusToList}}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <StackLayout Padding="10" x:DataType="local:CarStatusListItem">
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="{Binding Label}" FontSize="16" >
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding Source={RelativeSource AncestorType={x:Type vm:StatusViewModel}}, Path=Connected}" Value="false">
+                                                <Setter Property="TextColor" Value="LightGray"/>
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Label Text="{Binding Value}" FontSize="16" HorizontalOptions="EndAndExpand" >
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding Source={RelativeSource AncestorType={x:Type vm:StatusViewModel}}, Path=Connected}" Value="false">
+                                                <Setter Property="TextColor" Value="LightGray"/>
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                </StackLayout>
+
+                            </StackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+
+                </CollectionView>
+
+            </StackLayout>
+        </ScrollView>
+
+    </ContentPage.Content>
+</ContentPage>
