@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+
+#define REV2
 namespace Pin
 {
     // TFT & SD Card
@@ -25,7 +27,14 @@ namespace Pin
     constexpr int8_t Minute = 35; //  the Feather connects pin 35 to VBAT divider.
     // Other
     constexpr int8_t Buzzer = 12; // internal boot-related pull down. Use as output only.
-    // GPS (note, these are the default I2C pins)
+    // GPS
+#ifdef REV2
+    constexpr int8_t GpsRx = 16;
+    constexpr int8_t GpsTx = 17;
+#elif
+    // (note, these are the default I2C pins)
     constexpr int8_t GpsRx = 22;
     constexpr int8_t GpsTx = 23;
+#endif
+
 }

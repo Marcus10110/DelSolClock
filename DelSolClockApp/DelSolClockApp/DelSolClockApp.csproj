@@ -6,7 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ObjectDumper.NET" Version="3.3.13" />
     <PackageReference Include="Plugin.BLE" Version="2.1.2" />
+    <PackageReference Include="RestSharp" Version="106.12.0" />
     <PackageReference Include="Xamarin.Forms" Version="5.0.0.2012" />  
     <PackageReference Include="Xamarin.Essentials" Version="1.6.1" />
   </ItemGroup>

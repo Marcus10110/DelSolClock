@@ -1,12 +1,40 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DelSolClockApp.Views"  
              x:Class="DelSolClockApp.Views.UpdatePage">
     <ContentPage.Content>
-        <StackLayout>
-            <Label Text="Welcome to Xamarin.Forms!"
-                VerticalOptions="CenterAndExpand" 
-                HorizontalOptions="CenterAndExpand" />
-        </StackLayout>
+        <RefreshView x:DataType="local:UpdateViewModel" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=TwoWay}" >
+            <CollectionView x:Name="ReleasesListView"
+                ItemsSource="{Binding Releases}"
+                SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <StackLayout Orientation="Horizontal">
+                            <StackLayout Padding="10" x:DataType="{x:Type local:ReleaseBrowser+Release}">
+                                <StackLayout Orientation="Horizontal">
+                                    <Label Text="{Binding name}" 
+                            LineBreakMode="NoWrap" 
+                            Style="{DynamicResource ListItemTextStyle}" 
+                            FontSize="16" />
+                                    <Label Text="{Binding published_at}" 
+                            LineBreakMode="NoWrap" 
+                            Style="{DynamicResource ListItemTextStyle}" 
+                            FontSize="11"
+                                       VerticalOptions="End"/>
+                                </StackLayout>
+                                <Label Text="{Binding body}" 
+                            LineBreakMode="NoWrap"
+                            Style="{DynamicResource ListItemDetailTextStyle}"
+                            FontSize="13" />
+                            </StackLayout>
+                            <Button HorizontalOptions="EndAndExpand" VerticalOptions="Center" Text="Upload"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type local:UpdateViewModel}}, Path=UploadRelease}"		
+                                CommandParameter="{Binding .}"></Button>
+                        </StackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
     </ContentPage.Content>
 </ContentPage>
