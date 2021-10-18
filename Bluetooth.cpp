@@ -16,14 +16,18 @@
 #include "AppleMediaService.h"
 #include "CurrentTimeService.h"
 #include "AppleNotificationCenterService.h"
+#include "BleOta.h"
 
 #define APPLE_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
 
 #define DELSOL_VEHICLE_SERVICE_UUID "8fb88487-73cf-4cce-b495-505a4b54b802"
 #define DELSOL_STATUS_CHARACTERISTIC_UUID "40d527f5-3204-44a2-a4ee-d8d3c16f970e"
 #define DELSOL_BATTERY_CHARACTERISTIC_UUID "5c258bb8-91fc-43bb-8944-b83d0edc9b43"
+
+
 #define DELSOL_LOCATION_SERVICE_UUID "61d33c70-e3cd-4b31-90d8-a6e14162fffd"
 #define DELSOL_NAVIGATION_SERVICE_UUID "77f5d2b5-efa1-4d55-b14a-cc92b72708a0"
+
 
 namespace Bluetooth
 {
@@ -265,6 +269,8 @@ namespace Bluetooth
             Serial.println( "failed to get local address" );
         }
 
+        // Add the OTA service.
+        BleOta::Begin( Server );
 
         auto vechicle_service = Server->createService( DELSOL_VEHICLE_SERVICE_UUID );
         VehicleStatusCharacteristic = vechicle_service->createCharacteristic(

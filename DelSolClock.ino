@@ -6,12 +6,16 @@
 #include "CarIO.h"
 #include "Bluetooth.h"
 #include "Gps.h"
+#include "BleOta.h"
 #include <time.h>
 #include <sys/time.h>
 #include <TinyGPSPlus.h>
 
+// define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
+#define DEVKIT_ONLY 1
 namespace
 {
+    bool FwUpdateInProgress = false;
     bool NeverConnected = true;
     bool LightsAlarmActive = false;
     std::string StatusCharacteristicValue = "";
@@ -63,6 +67,9 @@ void setup()
 
 void HandlePowerState( const CarIO::CarStatus& car_status )
 {
+#ifdef DEVKIT_ONLY
+    return;
+#endif
     // if IGN and Illumination are off, go to sleep.
     if( !car_status.mIgnition && !car_status.mLights )
     {
@@ -126,6 +133,17 @@ void HandleStatusUpdate( const CarIO::CarStatus& car_status )
 
 void loop()
 {
+    uint32_t fw_bytes = 0;
+    if( BleOta::IsInProgress( &fw_bytes ) )
+    {
+        if( !FwUpdateInProgress )
+        {
+            FwUpdateInProgress = true;
+            // update the display
+            Serial.println( "FW Update started. Disabling normal functions." );
+        }
+        return; // don't do anything else while we're updating.
+    }
     Bluetooth::Service();
     Gps::Service();
     CarIO::Service();
