@@ -24,6 +24,20 @@ namespace DelSolClockApp.Services
 			public CarStatus Status { get; set; }
 		}
 
+		public class ConnectedEventArgs : System.EventArgs
+		{
+			public string Version { get; set; }
+		}
+
+		public struct FwUpdateProgress
+		{
+			public double PercentComplete { get; set; }
+			public double SecondsRemaining { get; set; }
+			public double SpeedBps { get; set; }
+			public bool Started { get; set; }
+
+		}
+
 		public static readonly Guid DelSolVehicleServiceGuid = new Guid("8fb88487-73cf-4cce-b495-505a4b54b802");
 		public static readonly Guid DelSolStatusCharacteristicGuid = new Guid("40d527f5-3204-44a2-a4ee-d8d3c16f970e");
 		public static readonly Guid DelSolBatteryCharacteristicGuid = new Guid("5c258bb8-91fc-43bb-8944-b83d0edc9b43");
@@ -31,13 +45,18 @@ namespace DelSolClockApp.Services
 		public static readonly Guid DelSolLocationServiceGuid = new Guid("61d33c70-e3cd-4b31-90d8-a6e14162fffd");
 		public static readonly Guid DelSolNavigationServiceGuid = new Guid("77f5d2b5-efa1-4d55-b14a-cc92b72708a0");
 
+		public static readonly Guid DelSolFirmwareServiceGuid = new Guid("69da0f2b-43a4-4c2a-b01d-0f11564c732b");
+		public static readonly Guid DelSolFirmwareWriteCharacteristicGuid = new Guid("7efc013a-37b7-44da-8e1c-06e28256d83b");
+		public static readonly Guid DelSolFirmwareVersionCharacteristicGuid = new Guid("a5c0d67a-9576-47ea-85c6-0347f8473cf3");
+
 		private IDevice DelSolDevice = null;
 		private ICharacteristic StatusCharacteristic = null;
+		private ICharacteristic WriteCharacteristic = null;
 		private IAdapter Adapter = null;
 		private bool Active = false;
 
 		public EventHandler<StatusChangedEventArgs> StatusChanged;
-		public EventHandler Connected;
+		public EventHandler<ConnectedEventArgs> Connected;
 		public EventHandler Disconnected;
 
 		private void StartAsyncTimer(TimeSpan period, Func<Task<bool>> callback)
@@ -133,6 +152,85 @@ namespace DelSolClockApp.Services
 			}
 			return ParseStatus(StatusCharacteristic.Value);
 		}
+
+		private TaskCompletionSource<string> WriteResultTask = null;
+
+		public async Task<bool> UpdateFirmware(System.IO.Stream bin, Action<FwUpdateProgress> percent_update_cb)
+		{
+			if (!IsConnected) throw new Exception("unable to update firmware, not connected");
+			if (WriteCharacteristic == null) throw new Exception("write characteristic is missing");
+
+			DateTime upload_start = DateTime.Now;
+			long total_size = bin.Length;
+			const int max_length = 512; // matches firmware.
+			byte[] buffer = new byte[max_length];
+			int read = 0;
+			long bytes_written = 0;
+			do
+			{
+				read = await bin.ReadAsync(buffer, 0, max_length);
+
+				byte[] write_buffer = new byte[read];
+				Array.Copy(buffer, write_buffer, read);
+				WriteResultTask = new TaskCompletionSource<string>();
+				var write_start = DateTime.Now;
+				var write_success = await WriteCharacteristic.WriteAsync(write_buffer);
+				if (!write_success)
+				{
+					throw new Exception("failed to write firmware, write failed");
+				}
+				bytes_written += read;
+				var write_success_time = DateTime.Now - write_start;
+				string result = await WriteResultTask.Task;
+				var response_time = DateTime.Now - write_start;
+				var elapsed_time = DateTime.Now - upload_start;
+
+
+
+				if (result == "continue")
+				{
+					double percent_done = 100 * (double)bytes_written / (double)total_size;
+					Logger.WriteLine($"wrote {read}, total {bytes_written}. {percent_done}%");
+					double average_bps = (double)bytes_written / elapsed_time.TotalSeconds;
+					double seconds_remaining = (total_size - bytes_written) / average_bps;
+					Logger.WriteLine($"{Math.Round(average_bps)}bps. write time: {write_success_time.TotalSeconds}, response time: {response_time.TotalSeconds} elapsed: {Math.Round(elapsed_time.TotalSeconds)}");
+					FwUpdateProgress update = new FwUpdateProgress { SpeedBps = average_bps, PercentComplete = percent_done, SecondsRemaining = seconds_remaining, Started = true };
+					percent_update_cb(update);
+				}
+				else if (result == "success")
+				{
+					Logger.WriteLine("upload success!");
+					return true;
+				}
+				else if (result == "error")
+				{
+					Logger.WriteLine($"FW upload error after section of {read}, total {bytes_written}");
+					return false;
+				}
+				else
+				{
+					throw new Exception($"could not understand response: \"{result}\"");
+				}
+
+			} while (read > 0);
+			throw new Exception($"reached the end of the FW update file, but did not get a finished response. total: {bytes_written}");
+		}
+
+		private void WriteCharacteristic_ValueUpdated(object sender, Plugin.BLE.Abstractions.EventArgs.CharacteristicUpdatedEventArgs e)
+		{
+
+			string value = Encoding.Default.GetString(e.Characteristic.Value);
+			if (WriteResultTask != null && !WriteResultTask.Task.IsCompleted)
+			{
+				Logger.WriteLine($"write characteristic notified: {value}, setting result.");
+				WriteResultTask.SetResult(value);
+			}
+			else
+			{
+				Logger.WriteLine($"Value changed without a valid task: {value}");
+			}
+		}
+
 		private async Task Service()
 		{
 
@@ -186,7 +284,30 @@ namespace DelSolClockApp.Services
 					StatusCharacteristic.ValueUpdated += Status_characteristic_ValueUpdated;
 					await StatusCharacteristic.StartUpdatesAsync();
 					Logger.WriteLine($"Initial Status: {System.Text.Encoding.Default.GetString(StatusCharacteristic.Value)}");
-					Connected?.Invoke(this, new EventArgs());
+
+					// Firmware Update
+					var firmware_service = await DelSolDevice.GetServiceAsync(DelSolFirmwareServiceGuid);
+					if (firmware_service == null)
+					{
+						throw new Exception("Firmware Serivce missing");
+					}
+					var version_characteristic = await firmware_service.GetCharacteristicAsync(DelSolFirmwareVersionCharacteristicGuid);
+					if (version_characteristic == null)
+					{
+						throw new Exception("version characteristic missing");
+					}
+					String version = System.Text.Encoding.Default.GetString(await version_characteristic.ReadAsync());
+					Logger.WriteLine($"current FW version: {version}");
+
+					WriteCharacteristic = await firmware_service.GetCharacteristicAsync(DelSolFirmwareWriteCharacteristicGuid);
+					if (WriteCharacteristic == null)
+					{
+						throw new Exception("write characteristic missing");
+					}
+					WriteCharacteristic.ValueUpdated += WriteCharacteristic_ValueUpdated;
+					await WriteCharacteristic.StartUpdatesAsync();
+
+					Connected?.Invoke(this, new ConnectedEventArgs { Version = version });
 					StatusChangedEventArgs args = new StatusChangedEventArgs();
 					args.Status = ParseStatus(StatusCharacteristic.Value);
 					StatusChanged?.Invoke(this, args);
@@ -206,7 +327,7 @@ namespace DelSolClockApp.Services
 		{
 			CarStatus status = new CarStatus();
 			if (value == null) return null;
-			String str = System.Text.Encoding.Default.GetString(value);
+			String str = Encoding.Default.GetString(value);
 			var items = str.Split(new char[] { ',' });
 			if (items.Length != 5) return null;
 			status.RearWindow = int.Parse(items[0]) != 0;
