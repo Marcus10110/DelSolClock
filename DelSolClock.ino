@@ -12,7 +12,7 @@
 #include <TinyGPSPlus.h>
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
-#define DEVKIT_ONLY 1
+// #define DISABLE_SLEEP 1
 namespace
 {
     bool FwUpdateInProgress = false;
@@ -67,7 +67,7 @@ void setup()
 
 void HandlePowerState( const CarIO::CarStatus& car_status )
 {
-#ifdef DEVKIT_ONLY
+#ifdef DISABLE_SLEEP
     return;
 #endif
     // if IGN and Illumination are off, go to sleep.
