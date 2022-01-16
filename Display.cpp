@@ -14,8 +14,8 @@
 #include "Fonts/FreeMono9pt7b.h"
 #include "Fonts/FreeMono12pt7b.h"
 
-constexpr int16_t TopPadding = 0;
-constexpr int16_t BottomPadding = 0;
+constexpr int16_t TopPadding = 5;
+constexpr int16_t BottomPadding = 10;
 constexpr int16_t LeftPadding = 0;
 constexpr int16_t RightPadding = 0;
 constexpr int16_t IconPlaceholderWidth = 70;
@@ -26,8 +26,8 @@ constexpr uint8_t TimeFontSize = 1;
 constexpr GFXfont const* TimeFont = &digital_7__mono_40pt7b;
 constexpr uint8_t NormalFontSize = 1;
 constexpr GFXfont const* NormalFont = &FreeMono9pt7b;
-
-
+constexpr uint8_t SpeedFontSize = 2;
+constexpr uint8_t MusicFontSize = 2;
 /*
 Ideas for display content:
 Time
@@ -302,18 +302,22 @@ namespace Display
     void DrawSpeed( float speed )
     {
         State.mSpeed = speed;
-        if( speed > 1 )
+        if( speed > 10 )
         {
             char display_string[ 20 ] = { 0 };
-            snprintf( display_string, sizeof( display_string ), "%.1f mi/h", speed );
-
+            snprintf( display_string, sizeof( display_string ), "%.0f", speed );
+            char mph[] = "MPH";
             gDisplay.setTextColor( DefaultTextColor );
+            gDisplay.setTextSize( SpeedFontSize );
             int16_t x, y;
             GetTextLocation( display_string, HorizontalAlignment::Left, VerticalAlignment::Top, &x, &y );
 
-
             gDisplay.setCursor( x, y );
             gDisplay.print( display_string );
+            gDisplay.setTextSize( NormalFontSize );
+
+            // add MPH
+            gDisplay.print( mph );
         }
     }
 
@@ -368,14 +372,17 @@ namespace Display
         State.mMediaArtist = artist;
         State.mMediaTitle = title;
         char display_string[ 128 ] = { 0 };
-        snprintf( display_string, sizeof( display_string ), "%s\n%s", title.c_str(), artist.c_str() );
+        snprintf( display_string, sizeof( display_string ), "%s", title.c_str() );
+        // snprintf( display_string, sizeof( display_string ), "%s\n%s", title.c_str(), artist.c_str() );
         gDisplay.setTextColor( DefaultTextColor );
+        gDisplay.setTextSize( MusicFontSize );
         gDisplay.setTextWrap( false );
         int16_t x, y;
         GetTextLocation( display_string, HorizontalAlignment::Left, VerticalAlignment::Bottom, &x, &y );
         gDisplay.setCursor( x, y );
         gDisplay.print( display_string );
         gDisplay.setTextWrap( true );
+        gDisplay.setTextSize( NormalFontSize );
     }
 
     void DrawDebugInfo( const std::string& message, bool center, bool fine_print )
