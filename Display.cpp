@@ -56,7 +56,8 @@ namespace Display
     namespace
     {
         SPIClass* gDisplaySpi = BuildDisplaySpi();
-        Adafruit_ST7789 gDisplay = Adafruit_ST7789( gDisplaySpi, Pin::TftCs, Pin::TftDc, Pin::TftReset );
+        Adafruit_ST7789 gTft = Adafruit_ST7789( gDisplaySpi, Pin::TftCs, Pin::TftDc, Pin::TftReset );
+        GFXcanvas16 gDisplayBuffer = GFXcanvas16( 240, 136 );
         SPIFFS_ImageReader reader;
         DisplayState State;
         struct Rect
@@ -81,6 +82,22 @@ namespace Display
             Center,
             Bottom
         };
+
+#define DRAW_WITH_BUFFER
+#ifdef DRAW_WITH_BUFFER
+        auto& gDisplay = gDisplayBuffer;
+        void DisplayCanvas()
+        {
+            gTft.drawRGBBitmap( 0, 0, gDisplayBuffer.getBuffer(), gDisplayBuffer.width(), gDisplayBuffer.height() );
+        }
+#else
+        auto& gDisplay = gTft;
+        void DisplayCanvas()
+        {
+        }
+#endif
+
+
         // get text position based on some settings. Uses current font settings, etc.
         // Note: this can't handle wrapping text for anything narrower than the screen width. For that we would need to re-implement
         // getTextBounds
@@ -138,7 +155,7 @@ namespace Display
 
     bool DisplayState::operator==( const DisplayState& rhs ) const
     {
-        return mHours24 == rhs.mHours24 && mMinutes == rhs.mMinutes && mSpead == rhs.mSpead && mIconHeadlight == rhs.mIconHeadlight &&
+        return mHours24 == rhs.mHours24 && mMinutes == rhs.mMinutes && mSpeed == rhs.mSpeed && mIconHeadlight == rhs.mIconHeadlight &&
                mIconBluetooth == rhs.mIconBluetooth && mIconShuffle == rhs.mIconShuffle && mIconRepeat == rhs.mIconRepeat &&
                mMediaTitle == rhs.mMediaTitle && mMediaArtist == rhs.mMediaArtist;
     }
@@ -151,7 +168,7 @@ namespace Display
     void DisplayState::Dump() const
     {
         Serial.printf( "time: %u:%u\n", mHours24, mMinutes );
-        Serial.printf( "speed: %f\n", mSpead );
+        Serial.printf( "speed: %f\n", mSpeed );
         Serial.printf( "icons: %i, %i, %i, %i\n", mIconHeadlight, mIconBluetooth, mIconShuffle, mIconRepeat );
         Serial.printf( "title: %s\n", mMediaTitle.c_str() );
         Serial.printf( "artist: %s\n", mMediaArtist.c_str() );
@@ -159,9 +176,9 @@ namespace Display
 
     void Begin()
     {
-        gDisplay.init( 136, 240 ); // one extra pixel removes that ugly garbage line at the bottom of the display.
+        gTft.init( 136, 240 ); // one extra pixel removes that ugly garbage line at the bottom of the display.
         Serial.println( "display initialized" );
-        gDisplay.setRotation( 3 );
+        gTft.setRotation( 3 );
 
         ScreenRect.x = LeftPadding;
         ScreenRect.y = TopPadding;
@@ -169,6 +186,7 @@ namespace Display
         ScreenRect.h = gDisplay.height() - TopPadding - BottomPadding;
 
         Clear();
+        DisplayCanvas();
         gDisplay.setCursor( 0, 0 );
         gDisplay.setTextColor( DefaultTextColor );
         gDisplay.setTextWrap( true );
@@ -182,15 +200,43 @@ namespace Display
         }
     }
 
+    void WriteDisplay()
+    {
+        DisplayCanvas();
+    }
+
+    void DrawBMP( char* path, int16_t x, int16_t y )
+    {
+#ifdef DRAW_WITH_BUFFER
+        SPIFFS_Image image;
+        reader.loadBMP( path, image );
+        auto format = image.getFormat();
+        if( format != IMAGE_16 )
+        {
+            return;
+        }
+        auto raw_canvas = image.getCanvas();
+        if( raw_canvas == nullptr )
+
+        {
+            return;
+        }
+        GFXcanvas16* image_canvas = static_cast<GFXcanvas16*>( raw_canvas );
+        gDisplayBuffer.drawRGBBitmap( x, y, image_canvas->getBuffer(), image_canvas->width(), image_canvas->height() );
+#else
+        reader.drawBMP( path, gTft, x, y );
+#endif
+    }
+
     void DrawSplash()
     {
         Clear();
-        reader.drawBMP( "/OldSols.bmp", gDisplay, 0, 0 );
+        DrawBMP( "/OldSols.bmp", 0, 0 );
     }
 
     void DrawLightAlarm()
     {
-        reader.drawBMP( "/light_large.bmp", gDisplay, 68, 16 ); // 104x104
+        DrawBMP( "/light_large.bmp", 68, 16 ); // 104x104
         gDisplay.setTextColor( DefaultTextColor );
         gDisplay.setTextSize( 2 );
         int16_t x, y;
@@ -255,7 +301,7 @@ namespace Display
 
     void DrawSpeed( float speed )
     {
-        State.mSpead = speed;
+        State.mSpeed = speed;
         if( speed > 1 )
         {
             char display_string[ 20 ] = { 0 };
@@ -313,7 +359,7 @@ namespace Display
 
         if( visible )
         {
-            reader.drawBMP( filename, gDisplay, x, y );
+            DrawBMP( filename, x, y );
         }
     }
 
@@ -357,7 +403,7 @@ namespace Display
 
     void EnableSleep( bool sleep )
     {
-        gDisplay.enableSleep( sleep );
+        gTft.enableSleep( sleep );
         CarIO::SetTftBrightness( sleep ? 0 : 255 );
     }
 
@@ -370,7 +416,7 @@ namespace Display
     {
         Clear();
         DrawTime( state.mHours24, state.mMinutes );
-        DrawSpeed( state.mSpead );
+        DrawSpeed( state.mSpeed );
         DrawIcon( Icon::Headlight, state.mIconHeadlight );
         DrawIcon( Icon::Bluetooth, state.mIconBluetooth );
         DrawIcon( Icon::Shuffle, state.mIconShuffle );

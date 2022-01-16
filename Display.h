@@ -19,7 +19,7 @@ namespace Display
     {
         uint8_t mHours24{ 0 };
         uint8_t mMinutes{ 0 };
-        float mSpead{ 0 };
+        float mSpeed{ 0 };
         bool mIconHeadlight{ false };
         bool mIconBluetooth{ false };
         bool mIconShuffle{ false };
@@ -32,9 +32,10 @@ namespace Display
     };
 
     void Begin();
+    void WriteDisplay(); // due to the canvas buffering to prevent flicker, this function must be called to actually update the display.
     void DrawSplash();
     void DrawLightAlarm();
-    void Clear();
+    void Clear(); // clears the buffer, but doe not actually clear the display. follow with WriteDisplay to blank the screen.
     void DrawTime( uint8_t hours24, uint8_t minutes );
     void DrawSpeed( float speed );
     void DrawIcon( Icon icon, bool visible );

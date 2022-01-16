@@ -12,7 +12,7 @@
 #include <TinyGPSPlus.h>
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
-// #define DISABLE_SLEEP 1
+#define DISABLE_SLEEP 1
 namespace
 {
     bool FwUpdateInProgress = false;
@@ -44,6 +44,7 @@ void setup()
     }
 
     Display::DrawSplash();
+    Display::WriteDisplay();
 
     Gps::Wake();
     Bluetooth::Begin();
@@ -62,6 +63,7 @@ void setup()
             DrawCurrentTime();
         }
         Display::DrawDebugInfo( "Bluetooth Discoverable.\nName: DelSolClock", !is_time_set, false );
+        Display::WriteDisplay();
     }
 }
 
@@ -87,6 +89,7 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
             LightsAlarmActive = true;
             Display::Clear();
             Display::DrawLightAlarm();
+            Display::WriteDisplay();
             CarIO::StartBeeper( 4, 493, 50, 125, 3000 );
         }
         return;
@@ -188,6 +191,7 @@ void loop()
                 DrawCurrentTime();
             }
             Display::DrawDebugInfo( "Bluetooth On\n  Name: \"Del Sol\"", !is_time_set, false );
+            Display::WriteDisplay();
         }
         delay( 100 );
         return;
@@ -201,13 +205,13 @@ void loop()
         new_state.mHours24 = time.tm_hour;
         new_state.mMinutes = time.tm_min;
     }
-    // TODO: GPS updates quite a bit, we should consider hanving a seperate regional clear for this.
+    // TODO: GPS updates quite a bit, we should consider having a separate regional clear for this.
     if( Gps::GetGps()->speed.isUpdated() )
     {
-        new_state.mSpead = Gps::GetGps()->speed.mph();
-        if( new_state.mSpead < 10 )
+        new_state.mSpeed = Gps::GetGps()->speed.mph();
+        if( new_state.mSpeed < 10 )
         {
-            new_state.mSpead = 0;
+            new_state.mSpeed = 0;
         }
     }
 
@@ -230,6 +234,7 @@ void loop()
         new_state.Dump();
         Serial.println( "" );
         Display::DrawState( new_state );
+        Display::WriteDisplay();
     }
     delay( 100 );
 }
