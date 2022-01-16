@@ -12,7 +12,7 @@
 #include <TinyGPSPlus.h>
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
-#define DISABLE_SLEEP 1
+// #define DISABLE_SLEEP
 namespace
 {
     bool FwUpdateInProgress = false;
@@ -90,7 +90,7 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
             Display::Clear();
             Display::DrawLightAlarm();
             Display::WriteDisplay();
-            CarIO::StartBeeper( 4, 493, 50, 125, 3000 );
+            CarIO::StartBeeper( 4, 1100, 80, 125, 1600 );
         }
         return;
     }
@@ -206,13 +206,9 @@ void loop()
         new_state.mMinutes = time.tm_min;
     }
     // TODO: GPS updates quite a bit, we should consider having a separate regional clear for this.
-    if( Gps::GetGps()->speed.isUpdated() )
+    if( Gps::GetGps()->speed.isValid() && Gps::GetGps()->speed.age() < 60000 )
     {
         new_state.mSpeed = Gps::GetGps()->speed.mph();
-        if( new_state.mSpeed < 10 )
-        {
-            new_state.mSpeed = 0;
-        }
     }
 
     new_state.mIconHeadlight = car_status.mLights;
