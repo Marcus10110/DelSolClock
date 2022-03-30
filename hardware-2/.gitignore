@@ -28,4 +28,5 @@ fp-info-cache
 *.xml
 *.csv
 
-jlcpcb/
+DelSolClock/jlcpcb/assembly/
+DelSolClock/jlcpcb/gerber/
