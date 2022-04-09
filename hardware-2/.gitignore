@@ -30,3 +30,6 @@ fp-info-cache
 
 DelSolClock/jlcpcb/assembly/
 DelSolClock/jlcpcb/gerber/
+
+DelSolClock-Rear/DelSolClock-Rear/jlcpcb/assembly/
+DelSolClock-Rear/DelSolClock-Rear/jlcpcb/gerber/

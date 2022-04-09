@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "DelSolLib")(type "KiCad")(uri "C:/Users/markg/Software/Personal/DelSolClock/hardware-2/DelSolLib.pretty")(options "")(descr ""))
+)
