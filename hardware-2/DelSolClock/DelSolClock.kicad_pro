@@ -342,8 +342,12 @@
     }
   },
   "libraries": {
-    "pinned_footprint_libs": [],
-    "pinned_symbol_libs": []
+    "pinned_footprint_libs": [
+      "DelSolLib"
+    ],
+    "pinned_symbol_libs": [
+      "DelSolLib"
+    ]
   },
   "meta": {
     "filename": "DelSolClock.kicad_pro",
