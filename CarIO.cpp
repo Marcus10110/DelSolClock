@@ -6,9 +6,7 @@ namespace CarIO
 {
     namespace
     {
-        constexpr uint8_t TftBacklightPwmChannel = 0;
         constexpr uint8_t BuzzerPwmChannel = 1;
-        bool TftPwmAttached = false;
         uint32_t BeeperStartMs = 0;
         bool BeeperActive = false;
         bool ToneActive = false;
@@ -28,8 +26,8 @@ namespace CarIO
     }
     void Setup()
     {
-        gpio_hold_dis( static_cast<gpio_num_t>( Pin::TftLit ) );
-        pinMode( Pin::TftLit, OUTPUT );
+        gpio_hold_dis( static_cast<gpio_num_t>( Pin::TftPower ) );
+        pinMode( Pin::TftPower, OUTPUT );
         pinMode( Pin::Battery, INPUT );
         pinMode( Pin::Illumination, INPUT );
         pinMode( Pin::Ignition, INPUT );
@@ -40,13 +38,8 @@ namespace CarIO
         pinMode( Pin::Minute, INPUT );
         pinMode( Pin::Buzzer, OUTPUT );
 
-        ledcSetup( TftBacklightPwmChannel, 5000, 8 ); // channel 0, 5 khz, 8 bit resolution
-        ledcSetup( BuzzerPwmChannel, 440, 8 );        // channel 1, 440 hz, 8 bit resolution
-        ledcAttachPin( Pin::TftLit, TftBacklightPwmChannel );
-        TftPwmAttached = true;
+        ledcSetup( BuzzerPwmChannel, 440, 8 ); // channel 1, 440 hz, 8 bit resolution
         ledcAttachPin( Pin::Buzzer, BuzzerPwmChannel );
-
-        ledcWrite( TftBacklightPwmChannel, 255 );
         ledcWrite( BuzzerPwmChannel, 0 );
 
         // set the ADC range to 0 to 800mV
@@ -56,11 +49,19 @@ namespace CarIO
     CarStatus GetStatus()
     {
         CarStatus status;
-        int battery_code = analogRead( Pin::Battery );
-        int illumination_code = analogRead( Pin::Illumination );
+        uint16_t battery_code = analogRead( Pin::Battery );
+        uint16_t illumination_code = analogRead( Pin::Illumination );
+        {
+            constexpr float a = 3.56743E-06;
+            constexpr float b = -0.007518604;
+            constexpr float c = 8.781351365;
+            float x = static_cast<float>( battery_code );
+            status.mBatteryVoltage = ( a * x * x ) + ( b * x ) + c;
+        }
         pinMode( Pin::Illumination, INPUT ); // required to put the pin back into digital mode.
+
         // Volts Per Code (Oct 2 2021) 0.0202547273
-        status.mBatteryVoltage = battery_code * 0.0202547273f;
+        // status.mBatteryVoltage = battery_code * 0.0202547273f;
         // volts per code (oct 2 2021) 0.003800545407
         status.mIlluminationVoltage = illumination_code * 0.003800545407f;
         status.mLights = digitalRead( Pin::Illumination );
@@ -70,6 +71,12 @@ namespace CarIO
         status.mRoof = digitalRead( Pin::Roof );
         status.mHourButton = digitalRead( Pin::Hour ) ? false : true;
         status.mMinuteButton = digitalRead( Pin::Minute ) ? false : true;
+
+        // debug for calibration
+        // Serial.printf( "%u\n", battery_code );
+        // Serial.printf( "battery code: %u [%f], lights code: %u [%f]\n", battery_code, status.mBatteryVoltage, illumination_code,
+        //               status.mIlluminationVoltage );
+
         return status;
     }
 
@@ -80,27 +87,6 @@ namespace CarIO
                        car_status.mRoof, car_status.mHourButton, car_status.mMinuteButton );
     }
 
-    void SetTftBrightness( int brightness )
-    {
-        if( brightness > 0 && !TftPwmAttached )
-        {
-            ledcAttachPin( Pin::TftLit, TftBacklightPwmChannel );
-        }
-
-        if( TftPwmAttached )
-        {
-            brightness = constrain( brightness, 0, 255 );
-            ledcWrite( TftBacklightPwmChannel, brightness );
-        }
-
-        if( brightness == 0 && TftPwmAttached )
-        {
-            // let's just set that pin to 0.
-            ledcDetachPin( Pin::TftLit );
-            TftPwmAttached = false;
-            digitalWrite( Pin::TftLit, 0 ); // drive low.
-        }
-    }
 
     void StartBeeper( int pulse_count, int pitch_hz, int pulse_duration_ms, int pulse_period_ms, int group_period_ms )
     {

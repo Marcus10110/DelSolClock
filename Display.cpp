@@ -176,6 +176,8 @@ namespace Display
 
     void Begin()
     {
+        digitalWrite( Pin::TftPower, 1 );
+        delay( 100 );
         gTft.init( 136, 240 ); // one extra pixel removes that ugly garbage line at the bottom of the display.
         Serial.println( "display initialized" );
         gTft.setRotation( 3 );
@@ -411,7 +413,7 @@ namespace Display
     void EnableSleep( bool sleep )
     {
         gTft.enableSleep( sleep );
-        CarIO::SetTftBrightness( sleep ? 0 : 255 );
+        // TODO: when sleeping, we'll want to cut power to the LCD. then we will need to re-initialize it when waking up.
     }
 
     const DisplayState& GetState()

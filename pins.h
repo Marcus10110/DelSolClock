@@ -8,9 +8,8 @@ namespace Pin
     // TFT & SD Card
     constexpr int8_t TftReset = 15;
     constexpr int8_t TftCs = 14;
-    constexpr int8_t TftDc = 32;
-    constexpr int8_t TftLit = 27;
-    constexpr int8_t SdCs = 33;
+    constexpr int8_t TftDc = 21;
+    constexpr int8_t TftPower = 27;
     // SPI
     constexpr int8_t Sck = 5;
     constexpr int8_t Miso = 19;
@@ -36,5 +35,4 @@ namespace Pin
     constexpr int8_t GpsRx = 22;
     constexpr int8_t GpsTx = 23;
 #endif
-
 }

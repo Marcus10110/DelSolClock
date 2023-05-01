@@ -230,10 +230,10 @@ namespace Bluetooth
     }
 
 
-    void Begin()
+    void Begin( const std::string& device_name )
     {
         Ended = false;
-        BLEDevice::init( "Del Sol" );
+        BLEDevice::init( device_name );
         Server = BLEDevice::createServer();
         Server->setCallbacks( new GetAddressServerCallbacks() );
 

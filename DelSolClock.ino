@@ -7,6 +7,7 @@
 #include "Bluetooth.h"
 #include "Gps.h"
 #include "BleOta.h"
+#include "motion.h"
 #include <time.h>
 #include <sys/time.h>
 #include <TinyGPSPlus.h>
@@ -19,6 +20,7 @@ namespace
     bool NeverConnected = true;
     bool LightsAlarmActive = false;
     std::string StatusCharacteristicValue = "";
+    const std::string BluetoothDeviceName = "Del Sol";
 }
 
 void setup()
@@ -30,6 +32,7 @@ void setup()
     CarIO::Setup();
     Display::Begin();
     Gps::Begin();
+    Motion::Begin();
 
 
     // go back to sleep if the car is off, or go into the alarm mode if the lights are on.
@@ -47,7 +50,7 @@ void setup()
     Display::WriteDisplay();
 
     Gps::Wake();
-    Bluetooth::Begin();
+    Bluetooth::Begin( BluetoothDeviceName );
 
     delay( 4000 ); // Keep OldSols logo on screen.
 
@@ -62,8 +65,9 @@ void setup()
         {
             DrawCurrentTime();
         }
-        Display::DrawDebugInfo( "Bluetooth Discoverable.\nName: DelSolClock", !is_time_set, false );
+        Display::DrawDebugInfo( "Bluetooth Discoverable\nName: " + BluetoothDeviceName, !is_time_set, false );
         Display::WriteDisplay();
+        delay( 1000 );
     }
 }
 
@@ -112,7 +116,7 @@ void Sleep()
     Serial.println( "going to sleep..." );
     Gps::Sleep();
     Display::EnableSleep( sleep );
-    gpio_hold_en( static_cast<gpio_num_t>( Pin::TftLit ) ); // hold 0 while sleeping.
+    gpio_hold_en( static_cast<gpio_num_t>( Pin::TftPower ) ); // hold 0 while sleeping.
     esp_sleep_enable_ext1_wakeup( ( 1ull << Pin::Ignition ) | ( 1ull << Pin::Illumination ), ESP_EXT1_WAKEUP_ANY_HIGH );
     Serial.flush();
     delay( 5 );

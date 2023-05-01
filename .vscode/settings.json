@@ -84,6 +84,5 @@
         "cinttypes": "cpp",
         "memory_resource": "cpp"
     },
-    "arduino.logLevel": "verbose",
     "clang-format.executable": "C:\\Users\\markg\\Software\\clang-format-6923b0a7.exe"
 }
