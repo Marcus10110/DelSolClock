@@ -5,7 +5,7 @@ This is a project to replace the clock in my car with an ESP32 and a small displ
 The replacement clock screen will display time, the currently playing music, and iOS notifications.
 
 Bluetooth low energy is used to communicate with a phone.
-Note, some servies should support any BLE phone, for example the current time service. However the Apple Media Service and the notification service only support iOS.
+Note, some services should support any BLE phone, for example the current time service. However the Apple Media Service and the notification service only support iOS.
 
 ## Features
 
