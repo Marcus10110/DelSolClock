@@ -1,30 +1,48 @@
 #include "display2.h"
 #include <SPIFFS_ImageReader.h>
+#include <map>
+#include <string>
 
 namespace Display
 {
     namespace
     {
+        // cache the loaded images, because image load time is SLOW (5 sec for splash)
+        std::map<std::string, SPIFFS_Image> mLoadedImages;
+
         void DefaultImageLoader( GFXcanvas16* destination, char* path, int16_t x, int16_t y )
         {
-            SPIFFS_ImageReader reader;
-            SPIFFS_Image image;
-            if( reader.loadBMP( path, image ) != IMAGE_SUCCESS )
+            void* raw_canvas = nullptr;
+            if( mLoadedImages.count( path ) == 0 )
             {
-                // failed to load image
-                return;
+                SPIFFS_ImageReader reader;
+                SPIFFS_Image& image = mLoadedImages[ path ];
+                auto load_result = reader.loadBMP( path, image );
+                if( load_result != IMAGE_SUCCESS )
+                {
+                    // failed to load image
+                    return;
+                }
+                auto format = image.getFormat();
+                if( format != IMAGE_16 )
+                {
+                    return;
+                }
+                raw_canvas = image.getCanvas();
+                if( raw_canvas == nullptr )
+                {
+                    return;
+                }
             }
-            auto format = image.getFormat();
-            if( format != IMAGE_16 )
+            else
             {
-                return;
+                raw_canvas = mLoadedImages.at( path ).getCanvas();
+                if( raw_canvas == nullptr )
+                {
+                    return;
+                }
             }
-            auto raw_canvas = image.getCanvas();
-            if( raw_canvas == nullptr )
 
-            {
-                return;
-            }
             GFXcanvas16* image_canvas = static_cast<GFXcanvas16*>( raw_canvas );
             destination->drawRGBBitmap( x, y, image_canvas->getBuffer(), image_canvas->width(), image_canvas->height() );
         }

@@ -125,7 +125,6 @@ namespace Screens
     void Discoverable::Draw( Display::Display* display )
     {
         display->clear();
-        display->setFont( nullptr );
         std::string message = "Bluetooth Discoverable\nName: " + mBluetoothName;
         int16_t x, y;
         display->GetTextLocation( message.c_str(), HorizontalAlignment::Left, VerticalAlignment::Center, &x, &y );
@@ -244,7 +243,7 @@ namespace Screens
             sprintf( buffer, "%.1f s", mTimeSec );
             DrawPair( display, "Time", buffer, x1, y1 );
 
-            sprintf( buffer, "%.1f mi", mDistanceMiles );
+            sprintf( buffer, "%.2f mi", mDistanceMiles );
             DrawPair( display, "Distance", buffer, x2, y1 );
 
             sprintf( buffer, "%.1f g", mAccelerationG );
@@ -252,8 +251,16 @@ namespace Screens
 
             sprintf( buffer, "%.1f mph", mSpeedMph );
             DrawPair( display, "Speed", buffer, x2, y1 + y_pitch );
-
-            DrawProgressBar( display, 120, 0.66 );
+            double distance = mDistanceMiles;
+            if( distance < 0 )
+            {
+                distance = 0;
+            }
+            if( distance > 0.25 )
+            {
+                distance = 0.25;
+            }
+            DrawProgressBar( display, 120, distance / 0.25 );
         }
 
         void Summary::Draw( Display::Display* display )
