@@ -7,7 +7,21 @@
 #include <SPIFFS_ImageReader.h>
 #include <string>
 
+#include "Fonts/FreeMono9pt7b.h"
+#include "Fonts/FreeMono12pt7b.h"
+#include "my_fonts/JetBrainsMono_Regular8pt7b.h"
+#include "my_fonts/JetBrainsMono_Regular10pt7b.h"
+#include "my_fonts/JetBrainsMono_Regular12pt7b.h"
 
+#include "my_fonts/JetBrainsMono_Thin6pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin7pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin8pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin9pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin10pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin12pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin14pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin16pt7b.h"
+#include "my_fonts/JetBrainsMono_Thin18pt7b.h"
 using namespace Display;
 
 namespace Screens
@@ -40,8 +54,7 @@ namespace Screens
         char display_string[ 128 ] = { 0 };
         snprintf( display_string, sizeof( display_string ), "%i:%02i", hours12, mMinutes );
         display->setFont( TimeFont );
-        display->setTextSize( TimeFontSize );
-        display->setTextColor( DefaultTextColor );
+        display->setTextSize( 1 );
         display->setTextWrap( false ); // disable wrap just for this function.
         int16_t x, y;
         Rect time_region;
@@ -50,8 +63,7 @@ namespace Screens
         display->print( display_string );
 
         // Draw AM / PM indicator
-        display->setFont( NormalFont );
-        display->setTextSize( NormalFontSize );
+        display->setFont( &JetBrainsMono_Thin8pt7b );
         display->setTextWrap( false );
         Rect afternoon_region;
         afternoon_region.x = time_region.x + time_region.w + 8;
@@ -68,14 +80,12 @@ namespace Screens
         // Music info
         snprintf( display_string, sizeof( display_string ), "%s", mMediaTitle.c_str() );
         // snprintf( display_string, sizeof( display_string ), "%s\n%s", title.c_str(), artist.c_str() );
-        display->setTextColor( DefaultTextColor );
-        display->setTextSize( MusicFontSize );
+        display->setFont( &JetBrainsMono_Thin14pt7b );
         display->setTextWrap( false );
         display->GetTextLocation( display_string, HorizontalAlignment::Left, VerticalAlignment::Bottom, &x, &y );
         display->setCursor( x, y );
         display->print( display_string );
         display->setTextWrap( true );
-        display->setTextSize( NormalFontSize );
 
 
         // speed
@@ -83,12 +93,11 @@ namespace Screens
         {
             snprintf( display_string, sizeof( display_string ), "%.0f", mSpeed );
             char mph[] = "MPH";
-            display->setTextColor( DefaultTextColor );
-            display->setTextSize( SpeedFontSize );
+            display->setFont( &JetBrainsMono_Thin12pt7b );
             display->WriteAligned( display_string, HorizontalAlignment::Left, VerticalAlignment::Top );
-            display->setTextSize( NormalFontSize );
 
             // add MPH
+            display->setFont( &JetBrainsMono_Thin8pt7b );
             display->print( mph );
         }
 
@@ -114,7 +123,8 @@ namespace Screens
     {
         display->clear();
         display->DrawBMP( "/light_large.bmp", 68, 16 ); // 104x104
-        display->setTextSize( 2 );
+        display->setFont( &JetBrainsMono_Thin16pt7b );
+        display->setTextSize( 1 );
         int16_t x, y;
         const char* str = "LIGHTS ON";
         display->GetTextLocation( str, HorizontalAlignment::Center, VerticalAlignment::Bottom, &x, &y );
@@ -125,6 +135,7 @@ namespace Screens
     void Discoverable::Draw( Display::Display* display )
     {
         display->clear();
+        display->setFont( &JetBrainsMono_Thin9pt7b );
         std::string message = "Bluetooth Discoverable\nName: " + mBluetoothName;
         int16_t x, y;
         display->GetTextLocation( message.c_str(), HorizontalAlignment::Left, VerticalAlignment::Center, &x, &y );
@@ -137,10 +148,11 @@ namespace Screens
         void DrawPair( Display::Display* display, const char* title, const char* value, int x, int y )
         {
             const int line_height = 20;
+
+            display->setFont( &JetBrainsMono_Thin7pt7b );
             display->setCursor( x, y );
-            display->setTextSize( 1 );
             display->write( title );
-            display->setTextSize( 1 );
+            display->setFont( &JetBrainsMono_Thin10pt7b );
             display->setCursor( x, y + line_height );
             display->write( value );
         }
@@ -187,28 +199,44 @@ namespace Screens
         DrawPair( display, "Battery", buffer, x1, y1 + y_pitch * 2 );
     }
 
+    void OtaInProgress::Draw( Display::Display* display )
+    {
+        char buffer[ 128 ];
+        sprintf( buffer, "%u Bytes", mBytesReceived );
+
+        display->clear();
+        display->setFont( &JetBrainsMono_Thin14pt7b );
+        display->WriteAligned( "Updating", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
+        display->setFont( &JetBrainsMono_Thin10pt7b );
+        display->WriteAligned( buffer, Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+    }
+
     namespace QuarterMile
     {
         void Start::Draw( Display::Display* display )
         {
             display->clear();
+            display->setFont( &JetBrainsMono_Thin14pt7b );
             display->WriteAligned( "Quarter Mile", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
-            display->WriteAligned( "Press M to start", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+            display->setFont( &JetBrainsMono_Thin10pt7b );
+            display->WriteAligned( "Press M to Start", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
         }
 
         void Launch::Draw( Display::Display* display )
         {
             display->clear();
             Display::Rect top_region;
+            display->setFont( &JetBrainsMono_Thin14pt7b );
             display->WriteAligned( "Quarter Mile", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top, nullptr,
                                    &top_region );
 
+            display->setFont( &JetBrainsMono_Thin8pt7b );
             Display::Rect second_region;
             second_region.x = 0;
             second_region.y = top_region.h + top_region.y + 10;
             second_region.w = 240;
             second_region.h = 135 - second_region.y;
-            display->WriteAligned( "Waiting for launch...", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top,
+            display->WriteAligned( "Waiting for Launch", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top,
                                    &second_region );
             char buffer[ 128 ];
             sprintf( buffer, "%.1f g", mAccelerationG );
@@ -232,13 +260,13 @@ namespace Screens
         void InProgress::Draw( Display::Display* display )
         {
             display->clear();
+            display->setFont( &JetBrainsMono_Thin14pt7b );
             display->WriteAligned( "Quarter Mile", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
 
             const int x1 = 10;
             const int x2 = 120;
             const int y1 = 40;
             const int y_pitch = 46;
-
             char buffer[ 128 ];
             sprintf( buffer, "%.1f s", mTimeSec );
             DrawPair( display, "Time", buffer, x1, y1 );
@@ -266,6 +294,7 @@ namespace Screens
         void Summary::Draw( Display::Display* display )
         {
             display->clear();
+            display->setFont( &JetBrainsMono_Thin14pt7b );
             display->WriteAligned( "Quarter Mile", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
 
             const int x1 = 10;
@@ -286,5 +315,49 @@ namespace Screens
             sprintf( buffer, "%.1f g", mMaxAccelerationG );
             DrawPair( display, "Max Accel", buffer, x2, y1 + y_pitch );
         }
+    }
+
+    void FontTest::Draw( Display::Display* display )
+    {
+        display->clear();
+        display->setFont( nullptr );
+        int16_t x = 0;
+        int16_t y = 0;
+        int16_t x1, y1;
+        uint16_t w, h;
+
+        auto test = [&]( const char* text, const GFXfont* font, int font_size ) {
+            display->setFont( font );
+            display->setTextSize( font_size );
+
+            display->getTextBounds( text, 0, 0, &x1, &y1, &w, &h );
+
+            display->setCursor( x, y );
+            display->write( text );
+            y += h;
+        };
+
+        // test( "default 1", nullptr, 1 );
+        // test( "default 2", nullptr, 2 );
+        // test( "default 3", nullptr, 3 );
+        y += 10; // some sort of transition from clasic mode to new mode, once a font is set? see setFont
+        test( "JetBrains 8 0.123", &JetBrainsMono_Thin8pt7b, 1 );
+        y += 10;
+        test( "JetBrains 9 0.123", &JetBrainsMono_Thin9pt7b, 1 );
+        y += 10;
+        test( "JetBrains 10 0.123", &JetBrainsMono_Thin10pt7b, 1 );
+        y += 10;
+        test( "JetBrains 12", &JetBrainsMono_Thin12pt7b, 1 );
+        y += 10;
+        test( "JetBrains 14", &JetBrainsMono_Thin14pt7b, 1 );
+        y += 10;
+        test( "JetBrains 16", &JetBrainsMono_Thin16pt7b, 1 );
+        y += 10;
+        test( "JetBrains 18", &JetBrainsMono_Thin18pt7b, 1 );
+        // test( "JetBrains 12 0.123", &JetBrainsMono_Regular12pt7b, 1 );
+        y += 10;
+        test( "FreeMono 9 0.123", &FreeMono9pt7b, 1 );
+        y += 10;
+        test( "FreeMono 12 0.123", &FreeMono12pt7b, 1 );
     }
 }

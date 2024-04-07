@@ -25,6 +25,7 @@ namespace Tft
         delay( 100 );
         mTft.init( 136, 240 );
         mTft.setRotation( 3 );
+        mTft.fillScreen( 0 );
 
         if( !SPIFFS.begin() )
         {

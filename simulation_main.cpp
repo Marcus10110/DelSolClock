@@ -59,6 +59,10 @@ void DelSolClockSimulator::Setup()
         if( auto code = sd.card()->errorCode() )
         {
             Serial.println( "SD initialization failed." );
+            printSdErrorSymbol( &Serial, code );
+            Serial.println( "" );
+            printSdErrorText( &Serial, code );
+            Serial.println( "" );
             Serial.println( ( int )code );
         }
         else if( sd.vol()->fatType() == 0 )
@@ -79,13 +83,15 @@ void DelSolClockSimulator::Setup()
     Serial.println( "end of LS" );
 }
 
-
-void DrawScreen( Screens::Screen& screen, int ms = 2000 )
+namespace
 {
-    screen.Draw( &display );
-    tft.drawRGBBitmap( 0, 0, display.getBuffer(), display.width(), display.height() );
-    tft.drawLine( 0, 135, 240, 135, 0xFFFF );
-    delay( ms );
+    void DrawScreen( Screens::Screen& screen, int ms = 2000 )
+    {
+        screen.Draw( &display );
+        tft.drawRGBBitmap( 0, 0, display.getBuffer(), display.width(), display.height() );
+        tft.drawLine( 0, 135, 240, 135, 0xFFFF );
+        delay( ms );
+    }
 }
 
 void DelSolClockSimulator::Loop()

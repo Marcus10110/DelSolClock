@@ -63,7 +63,7 @@ namespace Display
         setCursor( 0, 0 );
         setTextColor( DefaultTextColor );
         setTextWrap( true );
-        setFont( NormalFont );
+        setFont( nullptr );
         setTextSize( NormalFontSize );
     }
 

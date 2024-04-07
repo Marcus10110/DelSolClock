@@ -1,7 +1,7 @@
 {
-    "board": "esp32:esp32:featheresp32",
-    "configuration": "FlashFreq=80,UploadSpeed=921600,DebugLevel=none,PartitionScheme=default",
-    "sketch": "DelSolClock.ino",
-    "port": "COM9",
-    "output": "../temp/ArduinoBuild/DelSolClock"
+  "board": "esp32:esp32:featheresp32",
+  "configuration": "FlashFreq=80,UploadSpeed=921600,DebugLevel=none,PartitionScheme=default",
+  "sketch": "DelSolClock.ino",
+  "port": "COM9",
+  "output": "../temp/ArduinoBuild/DelSolClock"
 }

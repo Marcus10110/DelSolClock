@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "author": "Mark Garrison",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 63.35,
+      "left": -127.33,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "lcd1",
+      "top": 9.22,
+      "left": 61.52,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-microsd-card",
+      "id": "sd1",
+      "top": 353.18,
+      "left": -254.67,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    ["lcd1:GND", "esp:GND.1", "black", ["v39.14", "h-100.15", "v-114.89"]],
+    ["lcd1:CS", "esp:D15", "green", ["v28.77", "h-102.34", "v-115.63"]],
+    ["lcd1:RST", "esp:D4", "green", ["v22.09", "h-104.53", "v-114.89"]],
+    ["lcd1:D/C", "esp:D2", "green", ["v16.16", "h-104.49", "v-114.15"]],
+    ["lcd1:SCK", "esp:D18", "green", ["v10.23", "h-117.02", "v-158.63"]],
+    ["lcd1:MISO", "esp:D19", "green", ["v46.55", "h-176.99", "v-212"]],
+    ["lcd1:MOSI", "esp:D23", "green", ["v33.95", "h-159.3", "v-240.16"]],
+    ["esp:VIN", "lcd1:VCC", "red", ["h-10.84", "v133.05", "h247.33"]],
+    ["sd1:CS", "esp:D5", "green", ["h164.09", "v-265.44"]],
+    ["sd1:DI", "esp:D23", "green", ["h191.95", "v-320.28"]],
+    ["sd1:VCC", "esp:VIN", "red", ["h0"]],
+    ["sd1:SCK", "esp:D18", "green", ["h170.79", "v-246.64"]],
+    ["sd1:GND", "esp:GND.2", "black", ["h28.05", "v-159.34"]],
+    ["sd1:DO", "esp:D19", "green", ["h205.65", "v-217.37"]]
+  ],
+  "dependencies": {}
+}

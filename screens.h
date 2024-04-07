@@ -58,6 +58,13 @@ namespace Screens
         void Draw( Display::Display* display ) override;
     };
 
+    class OtaInProgress : public Screen
+    {
+      public:
+        void Draw( Display::Display* display ) override;
+        uint32_t mBytesReceived;
+    };
+
     namespace QuarterMile
     {
         class Start : public Screen
@@ -91,5 +98,11 @@ namespace Screens
         };
     }
 
+
+    class FontTest : public Screen
+    {
+      public:
+        void Draw( Display::Display* display ) override;
+    };
 
 }
