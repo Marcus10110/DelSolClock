@@ -1,4 +1,3 @@
-#if 1
 #include "main.h"
 #include "AppleMediaService.h"
 #include "CurrentTimeService.h"
@@ -350,4 +349,3 @@ void DrawCurrentTime()
         Serial.println( "failed to get time" );
     }
 }
-#endif

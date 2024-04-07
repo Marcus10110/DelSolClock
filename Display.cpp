@@ -10,7 +10,7 @@
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
 #include <SPI.h>
 #include <SPIFFS_ImageReader.h>
-#include "digital_7__mono_40pt7b.h"
+#include "my_fonts/digital_7__mono_40pt7b.h"
 
 #include "Fonts/FreeMono9pt7b.h"
 #include "Fonts/FreeMono12pt7b.h"

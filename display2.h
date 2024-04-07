@@ -2,7 +2,7 @@
 
 #include <Adafruit_GFX.h>
 
-#include "digital_7__mono_40pt7b.h"
+#include "my_fonts/digital_7__mono_40pt7b.h"
 #include "Fonts/FreeMono9pt7b.h"
 #include "Fonts/FreeMono12pt7b.h"
 

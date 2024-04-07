@@ -1,4 +1,0 @@
-[wokwi]
-version=1
-firmware='../temp/ArduinoBuild/DelSolClock/DelSolClock.ino.bin'
-elf='../temp/ArduinoBuild/DelSolClock/DelSolClock.ino.elf'
