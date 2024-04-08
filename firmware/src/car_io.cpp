@@ -2,6 +2,8 @@
 #include "car_io.h"
 #include "pins.h"
 
+#include <optional>
+
 namespace CarIO
 {
     namespace
@@ -16,6 +18,9 @@ namespace CarIO
         int PulseDurationMs;
         int PulsePeriodMs;
         int GroupPeriodMs;
+
+        std::optional<uint32_t> mMinuteDownMs{ std::nullopt };
+        std::optional<uint32_t> mHourDownMs{ std::nullopt };
     }
     std::string CarStatus::ToString()
     {
@@ -136,5 +141,42 @@ namespace CarIO
                 ToneActive = false;
             }
         }
+    }
+
+    // check to see if there is a button press event and return it.
+    ButtonEvents GetButtonEvents()
+    {
+        // if the previous state was low, the low duration was > 100ms, and the new state is high, we have an event.
+        auto now = millis();
+        auto state = GetStatus();
+        ButtonEvents events;
+        constexpr uint32_t ButtonDownMsMinimum = 100;
+
+        if( !mMinuteDownMs.has_value() && state.mMinuteButton )
+        {
+            mMinuteDownMs = now;
+        }
+        else if( mMinuteDownMs.has_value() && !state.mMinuteButton )
+        {
+            if( now - mMinuteDownMs.value() > ButtonDownMsMinimum )
+            {
+                events.mMinuteButtonPressed = true;
+            }
+            mMinuteDownMs = std::nullopt;
+        }
+        if( !mHourDownMs.has_value() && state.mHourButton )
+        {
+            mHourDownMs = now;
+        }
+        else if( mHourDownMs.has_value() && !state.mHourButton )
+        {
+            if( now - mHourDownMs.value() > ButtonDownMsMinimum )
+            {
+                events.mHourButtonPressed = true;
+            }
+            mHourDownMs = std::nullopt;
+        }
+
+        return events;
     }
 }

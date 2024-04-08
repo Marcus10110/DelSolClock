@@ -5,6 +5,17 @@
 
 namespace Motion
 {
+    struct State
+    {
+        float mForward; // X
+        float mLeft; // Y
+        float mUp; // Z
+        bool mValid{ false };
+    };
+
+
     void Begin();
+
+    State GetState();
 
 }

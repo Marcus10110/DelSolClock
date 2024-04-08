@@ -17,6 +17,13 @@ namespace CarIO
         std::string ToString();
     };
 
+    struct ButtonEvents
+    {
+        bool mHourButtonPressed{ false };
+        bool mMinuteButtonPressed{ false };
+    };
+
+
     void Setup();
     CarStatus GetStatus();
     void Print( const CarStatus& car_status );
@@ -25,4 +32,5 @@ namespace CarIO
     void StopBeeper();
     void Service();
 
+    ButtonEvents GetButtonEvents();
 }

@@ -104,7 +104,8 @@ namespace Bluetooth
                 }
                 else
                 {
-                    Serial.println( "Authentication failed" );
+                    Serial.printf( "Authentication failed. reason: %u, auth_mode: %u, key_present: %u, key_type: %u  \n", cmpl.fail_reason,
+                                   cmpl.auth_mode, cmpl.key_present, cmpl.key_type );
                 }
             }
         };

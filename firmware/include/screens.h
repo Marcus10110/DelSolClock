@@ -49,11 +49,11 @@ namespace Screens
     class Status : public Screen
     {
       public:
-        double mLatitude;
-        double mLongitude;
-        double mSpeedMph;
-        double mHeadingDegrees;
-        double mBatteryVolts;
+        double mLatitude{ 0 };
+        double mLongitude{ 0 };
+        double mSpeedMph{ 0 };
+        double mHeadingDegrees{ 0 };
+        double mBatteryVolts{ 0 };
 
         void Draw( Display::Display* display ) override;
     };
@@ -90,10 +90,10 @@ namespace Screens
         class Summary : public Screen
         {
           public:
-            double mQuarterMileTimeSec;
-            double mZeroSixtyTimeSec;
-            double mMaxAccelerationG;
-            double mMaxSpeedMph;
+            double mQuarterMileTimeSec{ 0 };
+            double mZeroSixtyTimeSec{ 0 };
+            double mMaxAccelerationG{ 0 };
+            double mMaxSpeedMph{ 0 };
             void Draw( Display::Display* display ) override;
         };
     }

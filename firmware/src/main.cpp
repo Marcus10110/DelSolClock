@@ -12,6 +12,7 @@
 #include "ble_ota.h"
 #include "motion.h"
 #include "demo.h"
+#include "quarter_mile.h"
 
 #include <TinyGPSPlus.h>
 
@@ -19,25 +20,31 @@
 #include <sys/time.h>
 
 
+enum class CurrentScreen
+{
+    Default, // clock, OTA, splash, etc.
+    Status,
+    QM,
+};
+
+
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
 #define DISABLE_SLEEP
 // define this to run the demo mode, which will cycle through all the screens.
-#define DEMO_MODE
+// #define DEMO_MODE
 namespace
 {
     bool FwUpdateInProgress = false;
-    bool NeverConnected = true;
     bool LightsAlarmActive = false;
     std::string StatusCharacteristicValue = "";
     const std::string BluetoothDeviceName = "Del Sol";
 
     Tft::Tft* gTft;
     Display::Display gDisplay;
-
+    CurrentScreen gCurrentScreen = CurrentScreen::Default;
 }
 
 void HandlePowerState( const CarIO::CarStatus& car_status );
-void DrawCurrentTime();
 void Sleep();
 
 
@@ -45,6 +52,9 @@ void setup()
 {
     Serial.begin( 115200 );
     Serial.println( "Del Sol Clock Booting" );
+
+    Serial.println( "setup, bluetooth begin..." );
+    Bluetooth::Begin( BluetoothDeviceName );
 
     // Required before we can handle the lights-only power mode.
     CarIO::Setup();
@@ -69,6 +79,7 @@ void setup()
 #endif
 
     // go back to sleep if the car is off, or go into the alarm mode if the lights are on.
+    Serial.println( "setup, HandlePowerState..." );
     HandlePowerState( CarIO::GetStatus() );
 
     // if the ignition is off, we wait until it's on, or we go to sleep.
@@ -77,24 +88,21 @@ void setup()
         HandlePowerState( CarIO::GetStatus() );
         CarIO::Service();
     }
-
+    Serial.println( "setup, GPS wake..." );
     Gps::Wake();
-    Bluetooth::Begin( BluetoothDeviceName );
 
+    Serial.println( "setup, bluetooth service..." );
     Bluetooth::Service(); // service once to see if we're already connected!
     if( !Bluetooth::IsConnected() )
     {
         // if we're still not connected, display the connection message. If we still have correct time stored in the RTC system, show time
         // too.
-        // TODO Display::Clear();
-        bool is_time_set = Bluetooth::IsTimeSet();
-        if( is_time_set )
-        {
-            DrawCurrentTime();
-        }
         Serial.println( "setting up to write bluetooth discoverable" );
-        // TODO Display::DrawDebugInfo( "Bluetooth Discoverable\nName: " + BluetoothDeviceName, !is_time_set, false );
-        // TODO Display::WriteDisplay();
+
+        Screens::Discoverable discoverable;
+        discoverable.mBluetoothName = BluetoothDeviceName;
+        discoverable.Draw( &gDisplay );
+        gTft->DrawCanvas( &gDisplay );
         delay( 1000 );
     }
 }
@@ -182,6 +190,29 @@ void loop()
     Gps::Service();
     CarIO::Service();
     auto car_status = CarIO::GetStatus();
+    auto button_events = CarIO::GetButtonEvents();
+    if( button_events.mHourButtonPressed )
+    {
+        Serial.println( "hour button clicked" );
+        // advance current screen by one.
+        if( gCurrentScreen == CurrentScreen::Default )
+        {
+            gCurrentScreen = CurrentScreen::Status;
+        }
+        else if( gCurrentScreen == CurrentScreen::Status )
+        {
+            gCurrentScreen = CurrentScreen::QM;
+            QuarterMile::Reset();
+        }
+        else if( gCurrentScreen == CurrentScreen::QM )
+        {
+            gCurrentScreen = CurrentScreen::Default;
+        }
+    }
+    if( button_events.mMinuteButtonPressed )
+    {
+        Serial.println( "minute button clicked" );
+    }
     HandlePowerState( car_status );
     HandleStatusUpdate( car_status );
     if( LightsAlarmActive )
@@ -189,97 +220,50 @@ void loop()
         return;
     }
 
-    if( NeverConnected && Bluetooth::IsConnected() )
+    if( gCurrentScreen == CurrentScreen::Default )
     {
-        NeverConnected = false;
-    }
-
-    if( NeverConnected && !Bluetooth::IsConnected() )
-    {
-        bool update = false;
-        bool is_time_set = Bluetooth::IsTimeSet();
-
+        // update the display with everything.
+        Screens::Clock clock;
         tm time;
-        if( is_time_set && getLocalTime( &time, 100 ) )
+        if( getLocalTime( &time, 100 ) )
         {
-            // TODO if( Display::GetState().mHours24 != time.tm_hour || Display::GetState().mMinutes != time.tm_min )
-            {
-                update = true;
-            }
+            clock.mHours24 = time.tm_hour;
+            clock.mMinutes = time.tm_min;
         }
 
-
-        // TODO if( car_status.mLights != Display::GetState().mIconHeadlight )
-        {
-            update = true;
-        }
-        if( update )
-        {
-            // TODO Display::Clear();
-            // TODO Display::DrawIcon( Display::Icon::Headlight, car_status.mLights );
-            if( is_time_set )
-            {
-                DrawCurrentTime();
-            }
-            // TODO Display::DrawDebugInfo( "Bluetooth On\n  Name: \"Del Sol\"", !is_time_set, false );
-            // TODO Display::WriteDisplay();
-        }
-        delay( 100 );
-        return;
-    }
-
-    /*
-        Display::DisplayState new_state;
-        tm time;
-        if( Bluetooth::IsTimeSet() && getLocalTime( &time, 100 ) )
-        {
-            new_state.mHours24 = time.tm_hour;
-            new_state.mMinutes = time.tm_min;
-        }
-        // TODO: GPS updates quite a bit, we should consider having a separate regional clear for this.
         if( Gps::GetGps()->speed.isValid() && Gps::GetGps()->speed.age() < 60000 )
         {
-            new_state.mSpeed = Gps::GetGps()->speed.mph();
+            clock.mSpeed = Gps::GetGps()->speed.mph();
         }
-
-        new_state.mIconHeadlight = car_status.mLights;
-        new_state.mIconBluetooth = Bluetooth::IsConnected();
-
+        clock.mHeadlight = car_status.mLights;
+        clock.mBluetooth = Bluetooth::IsConnected();
         const auto& media_info = AppleMediaService::GetMediaInformation();
-        new_state.mIconShuffle = media_info.mShuffleMode != AppleMediaService::MediaInformation::ShuffleMode::Off;
-        new_state.mIconRepeat = media_info.mRepeatMode != AppleMediaService::MediaInformation::RepeatMode::Off;
         if( media_info.mPlaybackState == AppleMediaService::MediaInformation::PlaybackState::Playing )
         {
-            new_state.mMediaArtist = media_info.mArtist;
-            new_state.mMediaTitle = media_info.mTitle;
+            clock.mMediaArtist = media_info.mArtist;
+            clock.mMediaTitle = media_info.mTitle;
         }
-        // if( Display::GetState() != new_state )
-        {
-            Serial.println( "Display state different! Current:" );
-            // Display::GetState().Dump();
-            Serial.println( "New:" );
-            new_state.Dump();
-            Serial.println( "" );
-            // Display::DrawState( new_state );
-            // Display::WriteDisplay();
-        }
-        */
-    delay( 100 );
-}
 
-void DrawCurrentTime()
-{
-    tm time;
-    if( getLocalTime( &time, 100 ) )
-    {
-        Screens::Clock clock;
-        clock.mHours24 = time.tm_hour;
-        clock.mMinutes = time.tm_min;
         clock.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
     }
-    else
+    else if( gCurrentScreen == CurrentScreen::Status )
     {
-        Serial.println( "failed to get time" );
+        Screens::Status status;
+        status.mBatteryVolts = car_status.mBatteryVoltage;
+        if( Gps::GetGps()->location.isValid() )
+        {
+            status.mLatitude = Gps::GetGps()->location.lat();
+            status.mLongitude = Gps::GetGps()->location.lng();
+            status.mSpeedMph = Gps::GetGps()->speed.mph();
+            status.mHeadingDegrees = Gps::GetGps()->course.deg();
+        }
+        status.Draw( &gDisplay );
+        gTft->DrawCanvas( &gDisplay );
     }
+    else if( gCurrentScreen == CurrentScreen::QM )
+    {
+        QuarterMile::Service( &gDisplay, gTft, button_events, Gps::GetGps() );
+    }
+    delay( 10 );
 }
