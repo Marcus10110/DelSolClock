@@ -37,6 +37,11 @@ namespace Tft
     {
         // TODO: power down / power up TFT.
         mTft.enableSleep( sleep );
+        if( sleep )
+        {
+            // TODO: what should we do here?
+            // gpio_hold_en( static_cast<gpio_num_t>( Pin::TftPower ) ); // hold 0 while sleeping.
+        }
     }
 
     void Tft::DrawCanvas( GFXcanvas16* canvas )

@@ -1,6 +1,4 @@
 #include <Arduino.h>
-
-
 #include "apple_media_service.h"
 #include "current_time_service.h"
 #include "apple_media_service.h"
@@ -13,13 +11,18 @@
 #include "gps.h"
 #include "ble_ota.h"
 #include "motion.h"
+#include "demo.h"
+
+#include <TinyGPSPlus.h>
+
 #include <time.h>
 #include <sys/time.h>
-#include <TinyGPSPlus.h>
 
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
 #define DISABLE_SLEEP
+// define this to run the demo mode, which will cycle through all the screens.
+#define DEMO_MODE
 namespace
 {
     bool FwUpdateInProgress = false;
@@ -36,78 +39,7 @@ namespace
 void HandlePowerState( const CarIO::CarStatus& car_status );
 void DrawCurrentTime();
 void Sleep();
-namespace
-{
-    void DrawScreen( Screens::Screen& screen, int ms = 3000 )
-    {
-        Serial.println( "DrawScreen" );
-        screen.Draw( &gDisplay );
-        gTft->DrawCanvas( &gDisplay );
-        delay( ms );
-    }
-}
 
-void Demo()
-{
-    Screens::FontTest font_test;
-    Screens::Discoverable discoverable;
-    discoverable.mBluetoothName = "Del Sol";
-    Screens::Splash splash;
-    Screens::Clock clock;
-    clock.mHours24 = 19;
-    clock.mMinutes = 58;
-    clock.mBluetooth = true;
-    clock.mMediaTitle = "Clocks";
-    clock.mMediaArtist = "Coldplay";
-    clock.mSpeed = 88.1;
-    clock.mHeadlight = true;
-    Screens::LightsAlarm lights_alarm;
-    Screens::Status status;
-    status.mLatitude = 37.7511596;
-    status.mLongitude = -122.4561478;
-    status.mSpeedMph = 88.1;
-    status.mBatteryVolts = 13.5;
-    status.mHeadingDegrees = 133;
-    Screens::QuarterMile::Start qm1;
-    Screens::QuarterMile::Launch qm2;
-    qm2.mAccelerationG = 0.1;
-    Screens::QuarterMile::InProgress qm3;
-    qm3.mTimeSec = 1;
-    qm3.mAccelerationG = 0.1;
-    qm3.mSpeedMph = 1;
-    qm3.mDistanceMiles = 0.1;
-    Screens::QuarterMile::Summary qm4;
-    qm4.mMaxAccelerationG = 0.9;
-    qm4.mMaxSpeedMph = 121.1;
-    qm4.mZeroSixtyTimeSec = 9.9;
-    qm4.mQuarterMileTimeSec = 87.1;
-    Screens::OtaInProgress ota;
-
-    for( uint32_t i = 0; i < 10000; i += 99 )
-    {
-        ota.mBytesReceived = i;
-        DrawScreen( ota, 15 );
-    }
-    // DrawScreen( font_test );
-    // DrawScreen( discoverable );
-    // DrawScreen( splash );
-    // DrawScreen( clock );
-
-    // DrawScreen( lights_alarm );
-    return;
-    DrawScreen( status );
-    DrawScreen( qm1 );
-    DrawScreen( qm2 );
-    for( float i = 0; i <= 0.25; i += 0.0025 )
-    {
-        qm3.mDistanceMiles = i;
-        qm3.mSpeedMph = ( i / 0.25 ) * 119;
-        qm3.mTimeSec = ( i / 0.25 ) * 14.1;
-        DrawScreen( qm3, 40 );
-    }
-    // DrawScreen( qm3 );
-    DrawScreen( qm4 );
-}
 
 void setup()
 {
@@ -116,21 +48,25 @@ void setup()
 
     // Required before we can handle the lights-only power mode.
     CarIO::Setup();
-    // Display::Begin();
     gTft = new Tft::Tft();
     gTft->Init();
     Gps::Begin();
     Motion::Begin();
 
-    Screens::Splash splash;
-    splash.Draw( &gDisplay );
-    gTft->DrawCanvas( &gDisplay );
-    delay( 1000 );
-    while( 1 )
     {
-        Demo();
+        // show splash screen.
+        Screens::Splash splash;
+        splash.Draw( &gDisplay );
+        gTft->DrawCanvas( &gDisplay );
+        delay( 3000 );
     }
 
+#ifdef DEMO_MODE
+    while( 1 )
+    {
+        Demo::Demo( &gDisplay, gTft );
+    }
+#endif
 
     // go back to sleep if the car is off, or go into the alarm mode if the lights are on.
     HandlePowerState( CarIO::GetStatus() );
@@ -138,18 +74,12 @@ void setup()
     // if the ignition is off, we wait until it's on, or we go to sleep.
     while( LightsAlarmActive )
     {
-        // delay( 10 );
         HandlePowerState( CarIO::GetStatus() );
         CarIO::Service();
     }
 
-    // TODO Display::DrawSplash();
-    // TODO Display::WriteDisplay();
-
     Gps::Wake();
     Bluetooth::Begin( BluetoothDeviceName );
-
-    delay( 4000 ); // Keep OldSols logo on screen.
 
     Bluetooth::Service(); // service once to see if we're already connected!
     if( !Bluetooth::IsConnected() )
@@ -189,10 +119,10 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
         {
             Serial.println( "Ignition is off, but Lights are on. Alarm" );
             LightsAlarmActive = true;
-            // TODO Display::Clear();
-            // TODO Display::DrawLightAlarm();
-            // TODO Display::WriteDisplay();
             CarIO::StartBeeper( 4, 1100, 80, 125, 1600 );
+            Screens::LightsAlarm lights_alarm;
+            lights_alarm.Draw( &gDisplay );
+            gTft->DrawCanvas( &gDisplay );
         }
         return;
     }
@@ -213,8 +143,7 @@ void Sleep()
 {
     Serial.println( "going to sleep..." );
     Gps::Sleep();
-    // TODO Display::EnableSleep( sleep );
-    gpio_hold_en( static_cast<gpio_num_t>( Pin::TftPower ) ); // hold 0 while sleeping.
+    gTft->EnableSleep( true );
     esp_sleep_enable_ext1_wakeup( ( 1ull << Pin::Ignition ) | ( 1ull << Pin::Illumination ), ESP_EXT1_WAKEUP_ANY_HIGH );
     Serial.flush();
     delay( 5 );
@@ -343,7 +272,11 @@ void DrawCurrentTime()
     tm time;
     if( getLocalTime( &time, 100 ) )
     {
-        // Display::DrawTime( time.tm_hour, time.tm_min );
+        Screens::Clock clock;
+        clock.mHours24 = time.tm_hour;
+        clock.mMinutes = time.tm_min;
+        clock.Draw( &gDisplay );
+        gTft->DrawCanvas( &gDisplay );
     }
     else
     {
