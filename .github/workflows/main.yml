@@ -34,7 +34,9 @@ jobs:
         run: pip install --upgrade platformio
 
       - name: Build PlatformIO Project
-        run: pio run
+        run: |
+          cd firmware
+          pio run
 
       # # publish tags as releases.
       # - name: Release
