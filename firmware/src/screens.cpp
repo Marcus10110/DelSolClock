@@ -145,14 +145,17 @@ namespace Screens
 
     namespace
     {
-        void DrawPair( Display::Display* display, const char* title, const char* value, int x, int y )
+        void DrawPair( Display::Display* display, const char* title, const char* value, int x, int y, bool tiny_value = false )
         {
             const int line_height = 20;
 
             display->setFont( &JetBrainsMono_Thin7pt7b );
             display->setCursor( x, y );
             display->write( title );
-            display->setFont( &JetBrainsMono_Thin10pt7b );
+            if( !tiny_value )
+            {
+                display->setFont( &JetBrainsMono_Thin10pt7b );
+            }
             display->setCursor( x, y + line_height );
             display->write( value );
         }
@@ -197,6 +200,9 @@ namespace Screens
 
         sprintf( buffer, "%2.1f V", mBatteryVolts );
         DrawPair( display, "Battery", buffer, x1, y1 + y_pitch * 2 );
+
+        sprintf( buffer, "% 1.1f/% 1.1f/% 1.1f", mForwardG, mLateralG, mVerticalG );
+        DrawPair( display, "G-Force", buffer, x2, y1 + y_pitch * 2, true );
     }
 
     void OtaInProgress::Draw( Display::Display* display )

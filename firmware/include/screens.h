@@ -54,6 +54,9 @@ namespace Screens
         double mSpeedMph{ 0 };
         double mHeadingDegrees{ 0 };
         double mBatteryVolts{ 0 };
+        double mForwardG{ 0 };
+        double mLateralG{ 0 };
+        double mVerticalG{ 0 };
 
         void Draw( Display::Display* display ) override;
     };

@@ -38,6 +38,7 @@ namespace Motion
         state.mForward = z;
         state.mLeft = x;
         state.mUp = y;
+        state.mValid = true;
 
 
         // the clock is slightly tilted, so we'll need to adjust the forward vector.

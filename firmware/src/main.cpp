@@ -258,6 +258,13 @@ void loop()
             status.mSpeedMph = Gps::GetGps()->speed.mph();
             status.mHeadingDegrees = Gps::GetGps()->course.deg();
         }
+        auto motion = Motion::GetState();
+        if( motion.mValid )
+        {
+            status.mForwardG = motion.mForward;
+            status.mLateralG = motion.mLeft;
+            status.mVerticalG = motion.mUp;
+        }
         status.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
     }
