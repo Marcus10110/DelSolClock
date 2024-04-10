@@ -182,28 +182,28 @@ namespace Screens
         char buffer[ 128 ];
         char ns = mLatitude > 0 ? 'N' : 'S';
         char ew = mLongitude > 0 ? 'E' : 'W';
-        sprintf( buffer, "%2.4f %c", abs( mLatitude ), ns );
+        snprintf( buffer, sizeof( buffer ), "%2.4f %c", std::abs( mLatitude ), ns );
         DrawPair( display, "Latitude", buffer, x1, y1 );
 
-        sprintf( buffer, "%3.4f %c", abs( mLongitude ), ew );
+        snprintf( buffer, sizeof( buffer ), "%3.4f %c", std::abs( mLongitude ), ew );
         DrawPair( display, "Longitude", buffer, x2, y1 );
 
-        sprintf( buffer, "%3.1f mph", mSpeedMph );
+        snprintf( buffer, sizeof( buffer ), "%3.1f mph", mSpeedMph );
         DrawPair( display, "Speed", buffer, x1, y1 + y_pitch );
 
         DrawPair( display, "Heading", HeadingToDirection( mHeadingDegrees ), x2, y1 + y_pitch );
 
-        sprintf( buffer, "%2.1f V", mBatteryVolts );
+        snprintf( buffer, sizeof( buffer ), "%2.1f V", mBatteryVolts );
         DrawPair( display, "Battery", buffer, x1, y1 + y_pitch * 2 );
 
-        sprintf( buffer, "% 1.1f/% 1.1f/% 1.1f", mForwardG, mLateralG, mVerticalG );
+        snprintf( buffer, sizeof( buffer ), "% 1.1f/% 1.1f/% 1.1f", mForwardG, mLateralG, mVerticalG );
         DrawPair( display, "G-Force", buffer, x2, y1 + y_pitch * 2, true );
     }
 
     void OtaInProgress::Draw( Display::Display* display )
     {
         char buffer[ 128 ];
-        sprintf( buffer, "%u Bytes", mBytesReceived );
+        snprintf( buffer, sizeof( buffer ), "%u Bytes", mBytesReceived );
 
         display->clear();
         display->setFont( &JetBrainsMono_Thin14pt7b );
@@ -240,7 +240,7 @@ namespace Screens
             display->WriteAligned( "Waiting for Launch", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top,
                                    &second_region );
             char buffer[ 128 ];
-            sprintf( buffer, "%.1f g", mAccelerationG );
+            snprintf( buffer, sizeof( buffer ), "%.1f g", mAccelerationG );
             display->WriteAligned( buffer, Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
         }
 
@@ -269,16 +269,16 @@ namespace Screens
             const int y1 = 40;
             const int y_pitch = 46;
             char buffer[ 128 ];
-            sprintf( buffer, "%.1f s", mTimeSec );
+            snprintf( buffer, sizeof( buffer ), "%.1f s", mTimeSec );
             DrawPair( display, "Time", buffer, x1, y1 );
 
-            sprintf( buffer, "%.2f mi", mDistanceMiles );
+            snprintf( buffer, sizeof( buffer ), "%.2f mi", mDistanceMiles );
             DrawPair( display, "Distance", buffer, x2, y1 );
 
-            sprintf( buffer, "%.1f g", mAccelerationG );
+            snprintf( buffer, sizeof( buffer ), "%.1f g", mAccelerationG );
             DrawPair( display, "Accel", buffer, x1, y1 + y_pitch );
 
-            sprintf( buffer, "%.1f mph", mSpeedMph );
+            snprintf( buffer, sizeof( buffer ), "%.1f mph", mSpeedMph );
             DrawPair( display, "Speed", buffer, x2, y1 + y_pitch );
             double distance = mDistanceMiles;
             if( distance < 0 )
@@ -304,16 +304,16 @@ namespace Screens
             const int y_pitch = 55;
 
             char buffer[ 128 ];
-            sprintf( buffer, "%.1f s", mQuarterMileTimeSec );
+            snprintf( buffer, sizeof( buffer ), "%.1f s", mQuarterMileTimeSec );
             DrawPair( display, "1/4 mi", buffer, x1, y1 );
 
-            sprintf( buffer, "%.1f s", mZeroSixtyTimeSec );
+            snprintf( buffer, sizeof( buffer ), "%.1f s", mZeroSixtyTimeSec );
             DrawPair( display, "0-60", buffer, x2, y1 );
 
-            sprintf( buffer, "%.1f mph", mMaxSpeedMph );
+            snprintf( buffer, sizeof( buffer ), "%.1f mph", mMaxSpeedMph );
             DrawPair( display, "Max Speed", buffer, x1, y1 + y_pitch );
 
-            sprintf( buffer, "%.1f g", mMaxAccelerationG );
+            snprintf( buffer, sizeof( buffer ), "%.1f g", mMaxAccelerationG );
             DrawPair( display, "Max Accel", buffer, x2, y1 + y_pitch );
         }
     }

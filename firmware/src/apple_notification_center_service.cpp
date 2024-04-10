@@ -94,21 +94,21 @@ namespace AppleNotifications
 
         if( !client->isConnected() )
         {
-            log_e( "client not connected" );
+            LOG_ERROR( "client not connected" );
             return false;
         }
 
         auto notification_service = client->getService( ANCS_SERVICE_UUID );
         if( !notification_service )
         {
-            log_e( "Apple ANCS service not found" );
+            LOG_ERROR( "Apple ANCS service not found" );
             return false;
         }
 
         auto notification_source = notification_service->getCharacteristic( APPLE_NOTIFICATION_SOURCE_CHARACTERISTIC_UUID );
         if( !notification_source )
         {
-            log_e( "Apple notification source characteristic not found" );
+            LOG_ERROR( "Apple notification source characteristic not found" );
             return false;
         }
 
@@ -116,7 +116,7 @@ namespace AppleNotifications
             []( BLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool is_notify ) {
                 if( length != 8 )
                 {
-                    log_e( "Apple notification source message not exactly 8 bytes" );
+                    LOG_ERROR( "Apple notification source message not exactly 8 bytes" );
                     return;
                 }
 

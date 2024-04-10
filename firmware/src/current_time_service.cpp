@@ -54,7 +54,7 @@ namespace CurrentTimeService
             CurrentTime time;
             if( length < 9 )
             {
-                log_e( "time data length too short" );
+                LOG_ERROR( "time data length too short" );
                 return time;
             }
             time.mYear = data[ 0 ] | ( data[ 1 ] << 8 );
@@ -117,21 +117,21 @@ namespace CurrentTimeService
 
         if( !client->isConnected() )
         {
-            log_e( "client not connected" );
+            LOG_ERROR( "client not connected" );
             return false;
         }
 
         auto time_service = client->getService( CURRENT_TIME_SERVICE_UUID );
         if( !time_service )
         {
-            log_e( "time service not found" );
+            LOG_ERROR( "time service not found" );
             return false;
         }
 
         auto current_time_characteristic = time_service->getCharacteristic( CURRENT_TIME_UUID );
         if( !current_time_characteristic )
         {
-            log_e( "current time characteristic not found" );
+            LOG_ERROR( "current time characteristic not found" );
             return false;
         }
 

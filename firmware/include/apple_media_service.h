@@ -57,7 +57,7 @@ namespace AppleMediaService
         TrackTitleOnly // only get notified when the track title is set.
     };
     // overwrites existing notification if set.
-    void RegisterForNotifications( NotificationCb callback, NotificationLevel level );
+    void RegisterForNotifications( const NotificationCb& callback, NotificationLevel level );
     const MediaInformation& GetMediaInformation();
     bool StartMediaService( BLEClient* client );
 }

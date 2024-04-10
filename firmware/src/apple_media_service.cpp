@@ -67,7 +67,7 @@ namespace AppleMediaService
         LOG_INFO( "duration: %f", mDuration );
     }
 
-    void RegisterForNotifications( NotificationCb callback, NotificationLevel level )
+    void RegisterForNotifications( const NotificationCb& callback, NotificationLevel level )
     {
         gCallback = callback;
         gNotificationLevel = level;
@@ -84,14 +84,14 @@ namespace AppleMediaService
 
         if( !client->isConnected() )
         {
-            log_e( "client not connected" );
+            LOG_ERROR( "client not connected" );
             return false;
         }
 
         auto music_service = client->getService( APPLE_SERVICE_UUID );
         if( !music_service )
         {
-            log_e( "Apple music service not found" );
+            LOG_ERROR( "Apple music service not found" );
             return false;
         }
 
@@ -99,7 +99,7 @@ namespace AppleMediaService
         auto remote_command_characteristic = music_service->getCharacteristic( APPLE_REMOTE_COMMAND_UUID );
         if( !remote_command_characteristic )
         {
-            log_e( "Apple remote command characteristic not found" );
+            LOG_ERROR( "Apple remote command characteristic not found" );
             return false;
         }
 
@@ -108,14 +108,14 @@ namespace AppleMediaService
         auto entity_attribute_characteristic = music_service->getCharacteristic( APPLE_REMOTE_COMMAND_UUID );
         if( !entity_attribute_characteristic )
         {
-            log_e( "Apple entity attribute characteristic not found" );
+            LOG_ERROR( "Apple entity attribute characteristic not found" );
             return false;
         }
 
         auto entity_update = music_service->getCharacteristic( APPLE_ENTITY_UPDATE_UUID );
         if( !entity_update )
         {
-            log_e( "Apple entity update characteristic not found" );
+            LOG_ERROR( "Apple entity update characteristic not found" );
             return false;
         }
 
@@ -123,14 +123,14 @@ namespace AppleMediaService
             bool notify = gNotificationLevel == NotificationLevel::All;
             if( length < 3 )
             {
-                log_e( "entity_update notification less than 3 bytes, ignoring." );
+                LOG_ERROR( "entity_update notification less than 3 bytes, ignoring." );
                 return;
             }
             uint8_t entity_id = data[ 0 ];
             uint8_t attribute_id = data[ 1 ];
             uint8_t flags = data[ 2 ];
             std::string value( reinterpret_cast<char*>( data ) + 3, length - 3 );
-            log_d( "entity update. id: %i, attribute: %i, flags: %i, value: %s", entity_id, attribute_id, flags, value.c_str() );
+            LOG_TRACE( "entity update. id: %i, attribute: %i, flags: %i, value: %s", entity_id, attribute_id, flags, value.c_str() );
             switch( entity_id )
             {
             case EntityIDPlayer:
