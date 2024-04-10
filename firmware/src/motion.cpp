@@ -1,4 +1,5 @@
 #include "motion.h"
+#include "logger.h"
 
 namespace Motion
 {
@@ -10,17 +11,17 @@ namespace Motion
 
     void Begin()
     {
+        LOG_TRACE( "Motion::Begin()" );
         if( !Sensor.begin_I2C() )
         {
             while( true )
             {
-                Serial.println( "failed to start I2C motion sensor" );
+                LOG_ERROR( "failed to start I2C motion sensor" );
                 delay( 1000 );
             }
 
             return;
         }
-        Serial.println( "I2C motion sensor found!" );
     }
 
     State GetState()

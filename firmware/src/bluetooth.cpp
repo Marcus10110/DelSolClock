@@ -17,6 +17,7 @@
 #include "current_time_service.h"
 #include "apple_notification_center_service.h"
 #include "ble_ota.h"
+#include "logger.h"
 
 #define APPLE_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
 
@@ -50,7 +51,7 @@ namespace Bluetooth
           public:
             void onConnect( BLEServer* server, esp_ble_gatts_cb_param_t* param ) override
             {
-                Serial.println( "onConnect CB" );
+                LOG_TRACE( "onConnect CB" );
                 if( IPhoneAddress )
                 {
                     delete IPhoneAddress;
@@ -63,7 +64,7 @@ namespace Bluetooth
 
             void onDisconnect( BLEServer* server ) override
             {
-                Serial.println( "onDisconnect CB" );
+                LOG_TRACE( "onDisconnect CB" );
                 DeviceConnected = false;
             }
         };
@@ -72,23 +73,23 @@ namespace Bluetooth
         {
             uint32_t onPassKeyRequest() override
             {
-                Serial.println( "PassKeyRequest" );
+                LOG_TRACE( "PassKeyRequest" );
                 return 123456;
             }
             void onPassKeyNotify( uint32_t pass_key ) override
             {
-                Serial.printf( "On passkey Notify number:%d\n", pass_key );
+                LOG_TRACE( "On passkey Notify number: %d", pass_key );
             }
 
             bool onSecurityRequest() override
             {
-                Serial.println( "On Security Request" );
+                LOG_TRACE( "On Security Request" );
                 return true;
             }
 
             bool onConfirmPIN( unsigned int ) override
             {
-                Serial.println( "On Confirmed Pin Request" );
+                LOG_TRACE( "On Confirmed Pin Request" );
                 return true;
             }
 
@@ -96,16 +97,16 @@ namespace Bluetooth
             {
                 if( cmpl.success )
                 {
-                    Serial.println( "Authentication Successful!" );
+                    LOG_DEBUG( "Authentication Successful!" );
                     uint16_t length;
                     esp_ble_gap_get_whitelist_size( &length );
-                    Serial.printf( "size: %d\n", length );
+                    LOG_TRACE( "size: %d", length );
                     AuthenticationComplete = true;
                 }
                 else
                 {
-                    Serial.printf( "Authentication failed. reason: %u, auth_mode: %u, key_present: %u, key_type: %u  \n", cmpl.fail_reason,
-                                   cmpl.auth_mode, cmpl.key_present, cmpl.key_type );
+                    LOG_ERROR( "Authentication failed. reason: %u, auth_mode: %u, key_present: %u, key_type: %u", cmpl.fail_reason,
+                               cmpl.auth_mode, cmpl.key_present, cmpl.key_type );
                 }
             }
         };
@@ -147,7 +148,7 @@ namespace Bluetooth
 
             if( Client )
             {
-                Serial.println( "HandleConnection: Client already exists, deleteing." );
+                LOG_WARN( "HandleConnection: Client already exists, deleteing." );
                 delete Client;
                 Client = nullptr;
             }
@@ -157,28 +158,28 @@ namespace Bluetooth
             Security.setAuthenticationMode( ESP_LE_AUTH_REQ_SC_BOND );
             Security.setCapability( ESP_IO_CAP_IO );
             Security.setRespEncryptionKey( ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK );
-            Serial.println( "set security details" );
+            LOG_TRACE( "set security details" );
 
             if( !Client->connect( *IPhoneAddress ) )
             {
-                Serial.println( "failed to connect" );
+                LOG_ERROR( "failed to connect" );
                 delete Client;
                 Client = nullptr;
                 return;
             }
-            Serial.println( "connected using client!" );
+            LOG_TRACE( "connected using client!" );
 
-            Serial.print( "Waiting for authentication" );
+            LOG_TRACE( "Waiting for authentication" );
             while( !AuthenticationComplete && Client->isConnected() )
             {
-                Serial.print( "." );
+                LOG_TRACE( "." );
                 delay( 100 );
             }
-            Serial.println( "Authentication finished" );
+            LOG_TRACE( "Authentication finished" );
             delay( 100 );
             if( !Client->isConnected() )
             {
-                Serial.println( "client disconnected during authentication." );
+                LOG_WARN( "client disconnected during authentication." );
                 delete Client;
                 Client = nullptr;
                 return;
@@ -189,26 +190,24 @@ namespace Bluetooth
                 Client->disconnect();
                 delete Client;
                 Client = nullptr;
-                Serial.println( "StartMediaService failed" );
+                LOG_ERROR( "StartMediaService failed" );
                 return;
             }
 
             CurrentTimeService::CurrentTime time;
             if( !CurrentTimeService::StartTimeService( Client, &time ) )
             {
-                Serial.println( "StartTimeService failed" );
+                LOG_ERROR( "StartTimeService failed" );
                 return;
             }
             timeval new_time;
             new_time.tv_sec = time.ToTimeT();
             new_time.tv_usec = static_cast<long>( time.mSecondsFraction * 1000000 );
-            Serial.print( "Unix time stamp: " );
-            Serial.print( new_time.tv_sec );
-            Serial.print( ", usec: " );
-            Serial.println( new_time.tv_usec );
+            LOG_INFO( "Unix time stamp: %l, usec: %l", new_time.tv_sec, new_time.tv_usec );
+
             if( settimeofday( &new_time, nullptr ) != 0 )
             {
-                Serial.println( "Error setting time of day" );
+                LOG_ERROR( "Error setting time of day" );
             }
             else
             {
@@ -220,10 +219,10 @@ namespace Bluetooth
 #if 0
             if( !AppleNotifications::StartNotificationService( Client ) )
             {
-                Serial.println( "failed to start the notification service" );
+                LOG_ERROR( "failed to start the notification service" );
                 return;
             }
-            Serial.println( "Notification service started" );
+            LOG_TRACE( "Notification service started" );
 #endif
         }
 
@@ -233,6 +232,7 @@ namespace Bluetooth
 
     void Begin( const std::string& device_name )
     {
+        LOG_TRACE( "Bluetooth::Begin()" );
         Ended = false;
         BLEDevice::init( device_name );
         Server = BLEDevice::createServer();
@@ -241,33 +241,24 @@ namespace Bluetooth
         const uint8_t* address = esp_bt_dev_get_address();
         if( address )
         {
-            Serial.print( "public device address: " );
-            for( int i = 0; i < 6; ++i )
-            {
-                Serial.print( address[ i ], HEX );
-            }
-            Serial.println( "" );
+            LOG_DEBUG( "public device address:  %02X %02X %02X %02X %02X %02X %02X %02X", address[ 0 ], address[ 1 ], address[ 2 ],
+                       address[ 3 ], address[ 4 ], address[ 5 ] );
         }
         else
         {
-            Serial.println( "device address null" );
+            LOG_ERROR( "public device address null" );
         }
 
         esp_bd_addr_t local_address;
         uint8_t address_type;
         if( esp_ble_gap_get_local_used_addr( local_address, &address_type ) == ESP_OK )
         {
-            Serial.print( "local device address: " );
-            for( int i = 0; i < 6; ++i )
-            {
-                Serial.print( local_address[ i ], HEX );
-            }
-            Serial.println( "" );
-            Serial.printf( "local address type: %u\n", address_type );
+            LOG_DEBUG( "public device address:  %02X %02X %02X %02X %02X %02X %02X %02X. Type: %u", local_address[ 0 ], local_address[ 1 ],
+                       local_address[ 2 ], local_address[ 3 ], local_address[ 4 ], local_address[ 5 ], address_type );
         }
         else
         {
-            Serial.println( "failed to get local address" );
+            LOG_ERROR( "failed to get local address" );
         }
 
         // Add the OTA service.
@@ -303,7 +294,7 @@ namespace Bluetooth
         auto before = oAdvertisementData.getPayload().size();
         oAdvertisementData.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
         auto after = oAdvertisementData.getPayload().size();
-        Serial.printf( "advertising size before %i, after %i\n", before, after );
+        LOG_TRACE( "advertising size before %i, after %i", before, after );
         advertising->setAdvertisementData( oAdvertisementData );
         advertising->setScanResponseData( scan_response_data );
 
@@ -363,7 +354,7 @@ namespace Bluetooth
             }
             AuthenticationComplete = false;
             Server->startAdvertising(); // restart advertising
-            Serial.println( "disconnected, restart advertising" );
+            LOG_DEBUG( "disconnected, restart advertising" );
             OldDeviceConnected = DeviceConnected;
         }
         // connecting
@@ -371,9 +362,9 @@ namespace Bluetooth
         {
             // do stuff here on connecting
             OldDeviceConnected = DeviceConnected;
-            Serial.println( "connected!" );
+            LOG_DEBUG( "connected!" );
             HandleConnection();
-            Serial.println( "HandleConnection returned" );
+            LOG_TRACE( "HandleConnection returned" );
         }
     }
 
@@ -393,7 +384,7 @@ namespace Bluetooth
         {
             VehicleStatusCharacteristic->setValue( status );
             VehicleStatusCharacteristic->notify();
-            Serial.println( "set characteristic notify." );
+            LOG_TRACE( "set characteristic notify." );
         }
     }
 }

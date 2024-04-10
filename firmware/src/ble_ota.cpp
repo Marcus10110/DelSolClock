@@ -1,5 +1,6 @@
 #include "ble_ota.h"
 #include "version.h"
+#include "logger.h"
 
 #include <Arduino.h>
 #include <BLEServer.h>
@@ -29,29 +30,29 @@ namespace BleOta
                 std::string rxData = characteristic->getValue();
                 if( BytesReceived == 0 )
                 {
-                    Serial.println( "BeginOTA" );
+                    LOG_TRACE( "BeginOTA" );
                 }
 
                 if( rxData.length() > 0 )
                 {
                     status = esp_ota_write( UpdateHandle, rxData.c_str(), rxData.length() );
-                    Serial.printf( "esp_ota_write: %i\n", status );
+                    LOG_TRACE( "esp_ota_write: %i", status );
                     BytesReceived += rxData.length();
-                    Serial.printf( "OTA received %u bytes\n", BytesReceived );
+                    LOG_TRACE( "OTA received %u bytes", BytesReceived );
                 }
                 auto write_time = millis() - start_time;
                 if( rxData.length() != FullOtaPacketSize && BytesReceived > 0 )
                 {
-                    Serial.println( "EndOTA" );
+                    LOG_TRACE( "EndOTA" );
                     status = esp_ota_end( UpdateHandle );
-                    Serial.printf( "esp_ota_end: %i\n", status );
+                    LOG_TRACE( "esp_ota_end: %i", status );
                     status = esp_ota_set_boot_partition( esp_ota_get_next_update_partition( NULL ) );
-                    Serial.printf( "esp_ota_set_boot_partition: %i\n", status );
+                    LOG_TRACE( "esp_ota_set_boot_partition: %i", status );
                     if( status == ESP_OK )
                     {
                         characteristic->setValue( "success" );
                         characteristic->notify();
-                        Serial.println( "notified success" );
+                        LOG_TRACE( "notified success" );
                         delay( 2000 );
                         esp_restart();
                         return;
@@ -59,9 +60,9 @@ namespace BleOta
                     else
                     {
                         BytesReceived = 0;
-                        Serial.println( "Upload Error" );
+                        LOG_ERROR( "Upload Error" );
                         characteristic->setValue( "error" );
-                        Serial.println( "notified error" );
+                        LOG_TRACE( "notified error" );
                         characteristic->notify();
                         return;
                     }
@@ -69,17 +70,17 @@ namespace BleOta
 
 
                 characteristic->setValue( "continue" );
-                Serial.println( "notified continue" );
+                LOG_TRACE( "notified continue" );
                 characteristic->notify();
                 auto total_time = millis() - start_time;
-                Serial.printf( "OTA fw write %i, total %i\n", write_time, total_time );
+                LOG_TRACE( "OTA fw write %i, total %i", write_time, total_time );
             }
         };
     }
     void Begin( BLEServer* server )
     {
         auto status = esp_ota_begin( esp_ota_get_next_update_partition( NULL ), OTA_SIZE_UNKNOWN, &UpdateHandle );
-        Serial.printf( "esp_ota_begin: %i\n", status );
+        LOG_TRACE( "esp_ota_begin: %i", status );
         if( status != ESP_OK )
         {
             return;
@@ -94,7 +95,7 @@ namespace BleOta
 
         version_characteristic->setValue( VERSION );
         service->start();
-        Serial.printf( "Started OTA service. Current version: %s\n", VERSION );
+        LOG_TRACE( "Started OTA service. Current version: %s", VERSION );
     }
 
     bool IsInProgress( uint32_t* bytes_received )

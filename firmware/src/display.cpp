@@ -21,19 +21,19 @@ namespace Display
                 if( load_result != IMAGE_SUCCESS )
                 {
                     // failed to load image
-                    Serial.printf( "Failed to load image %s, code: %u\n", path, load_result );
+                    LOG_ERROR( "Failed to load image %s, code: %u", path, load_result );
                     return;
                 }
                 auto format = image.getFormat();
                 if( format != IMAGE_16 )
                 {
-                    Serial.printf( "Unsupported image format %u\n", format );
+                    LOG_ERROR( "Unsupported image format %u", format );
                     return;
                 }
                 raw_canvas = image.getCanvas();
                 if( raw_canvas == nullptr )
                 {
-                    Serial.println( "Failed to get canvas from image" );
+                    LOG_ERROR( "Failed to get canvas from image" );
                     return;
                 }
             }
@@ -42,7 +42,7 @@ namespace Display
                 raw_canvas = mLoadedImages.at( path ).getCanvas();
                 if( raw_canvas == nullptr )
                 {
-                    Serial.println( "(CACHE) Failed to get canvas from image" );
+                    LOG_ERROR( "Failed to get canvas from cached image" );
                     return;
                 }
             }

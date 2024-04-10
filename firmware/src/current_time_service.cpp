@@ -1,4 +1,5 @@
 #include "current_time_service.h"
+#include "logger.h"
 
 #include <BLEClient.h>
 #include <Arduino.h>
@@ -72,12 +73,12 @@ namespace CurrentTimeService
     {
         if( mDayOfWeek != DayOfWeek::Unknown )
         {
-            Serial.printf( "%s, %hhu/%hhu/%hu %hhu:%hhu:%hhu.%f\n", DayOfWeekToString( mDayOfWeek ), mMonth, mDay, mYear, mHours, mMinutes,
-                           mSeconds, mSecondsFraction );
+            LOG_INFO( "%s, %hhu/%hhu/%hu %hhu:%hhu:%hhu.%f", DayOfWeekToString( mDayOfWeek ), mMonth, mDay, mYear, mHours, mMinutes,
+                      mSeconds, mSecondsFraction );
         }
         else
         {
-            Serial.printf( "%hhu/%hhu/%hu %hhu:%hhu:%hhu.%f\n", mMonth, mDay, mYear, mHours, mMinutes, mSeconds, mSecondsFraction );
+            LOG_INFO( "%hhu/%hhu/%hu %hhu:%hhu:%hhu.%f", mMonth, mDay, mYear, mHours, mMinutes, mSeconds, mSecondsFraction );
         }
     }
     time_t CurrentTime::ToTimeT() const
@@ -139,7 +140,7 @@ namespace CurrentTimeService
         current_time_characteristic->registerForNotify(
             []( BLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool is_notify ) {
                 // TODO: notify the application, if interested.
-                Serial.println( "Current time has been editied." );
+                LOG_INFO( "Current time has been edited." );
                 auto time = ParseCurrentTime( data, length );
                 time.Dump();
             } );
@@ -148,14 +149,14 @@ namespace CurrentTimeService
         auto local_time_characteristic = time_service->getCharacteristic( LOCAL_TIME_INFORMATION_UUID );
         if( !local_time_characteristic )
         {
-            log_w( "optional local time characteristic not found" );
+            LOG_WARN( "optional local time characteristic not found" );
         }
 
         // TODO: add support for the reference time characteristic
         auto reference_time_characteristic = time_service->getCharacteristic( REFERENCE_TIME_INFORMATION );
         if( !reference_time_characteristic )
         {
-            log_w( "optional reference time characteristic not found" );
+            LOG_WARN( "optional reference time characteristic not found" );
         }
 
         if( current_time != nullptr )

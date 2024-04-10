@@ -1,4 +1,5 @@
 #include "apple_media_service.h"
+#include "logger.h"
 
 #include <BLEClient.h>
 #include <Arduino.h>
@@ -57,13 +58,13 @@ namespace AppleMediaService
 
     void MediaInformation::dump() const
     {
-        Serial.printf( "player: %s\n", mPlayerName.c_str() );
-        Serial.printf( "playback state: %i, rate: %f, elapsed: %f, volume: %f\n", mPlaybackState, mPlaybackRate, mElapsedTime, mVolume );
-        Serial.printf( "queue index: %i, count: %i, shuffle: %i, repeat: %i\n", mQueueIndex, mQueueCount, mShuffleMode, mRepeatMode );
-        Serial.printf( "artist: %s\n", mArtist.c_str() );
-        Serial.printf( "album: %s\n", mAlbum.c_str() );
-        Serial.printf( "title: %s\n", mTitle.c_str() );
-        Serial.printf( "duration: %f\n", mDuration );
+        LOG_INFO( "player: %s", mPlayerName.c_str() );
+        LOG_INFO( "playback state: %i, rate: %f, elapsed: %f, volume: %f", mPlaybackState, mPlaybackRate, mElapsedTime, mVolume );
+        LOG_INFO( "queue index: %i, count: %i, shuffle: %i, repeat: %i", mQueueIndex, mQueueCount, mShuffleMode, mRepeatMode );
+        LOG_INFO( "artist: %s", mArtist.c_str() );
+        LOG_INFO( "album: %s", mAlbum.c_str() );
+        LOG_INFO( "title: %s", mTitle.c_str() );
+        LOG_INFO( "duration: %f", mDuration );
     }
 
     void RegisterForNotifications( NotificationCb callback, NotificationLevel level )

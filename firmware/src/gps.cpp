@@ -2,6 +2,7 @@
 #include "pins.h"
 #include <TinyGPSPlus.h>
 #include "driver/uart.h"
+#include "logger.h"
 
 namespace Gps
 {
@@ -19,6 +20,7 @@ namespace Gps
     }
     void Begin()
     {
+        LOG_TRACE( "Gps::Begin()" );
         uart_config_t uart_config;
         uart_config.baud_rate = 9600;
         uart_config.data_bits = UART_DATA_8_BITS;
@@ -60,7 +62,7 @@ namespace Gps
         {
             float lat = Gps.location.lat();
             float lng = Gps.location.lng();
-            Serial.printf( "GPS: %f, %f\n", lat, lng );
+            LOG_TRACE( "GPS: %f, %f", lat, lng );
         }
     }
     void Wake()

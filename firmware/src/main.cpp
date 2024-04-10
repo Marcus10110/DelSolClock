@@ -13,6 +13,7 @@
 #include "motion.h"
 #include "demo.h"
 #include "quarter_mile.h"
+#include "logger.h"
 
 #include <TinyGPSPlus.h>
 
@@ -51,7 +52,7 @@ void Sleep();
 void setup()
 {
     Serial.begin( 115200 );
-    Serial.println( "Del Sol Clock Booting" );
+    LOG_TRACE( "Del Sol Clock Booting" );
 
 
     // Required before we can handle the lights-only power mode.
@@ -68,7 +69,6 @@ void setup()
         gTft->DrawCanvas( &gDisplay );
     }
 
-    Serial.println( "setup, bluetooth begin..." );
     Bluetooth::Begin( BluetoothDeviceName );
     // leave splash screen up for a few seconds.
     delay( 3000 );
@@ -82,7 +82,7 @@ void setup()
 #endif
 
     // go back to sleep if the car is off, or go into the alarm mode if the lights are on.
-    Serial.println( "setup, HandlePowerState..." );
+    LOG_TRACE( "setup, HandlePowerState..." );
     HandlePowerState( CarIO::GetStatus() );
 
     // if the ignition is off, we wait until it's on, or we go to sleep.
@@ -91,22 +91,21 @@ void setup()
         HandlePowerState( CarIO::GetStatus() );
         CarIO::Service();
     }
-    Serial.println( "setup, GPS wake..." );
+    LOG_TRACE( "setup, GPS wake..." );
     Gps::Wake();
 
-    Serial.println( "setup, bluetooth service..." );
+    LOG_TRACE( "setup, bluetooth service..." );
     Bluetooth::Service(); // service once to see if we're already connected!
     if( !Bluetooth::IsConnected() )
     {
         // if we're still not connected, display the connection message. If we still have correct time stored in the RTC system, show time
         // too.
-        Serial.println( "setting up to write bluetooth discoverable" );
-
         Screens::Discoverable discoverable;
         discoverable.mBluetoothName = BluetoothDeviceName;
         discoverable.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
         delay( 1000 );
+        // TODO: should we keep this screen up until we get the first connection? Especially since we don't know the time yet?
     }
 }
 
@@ -118,7 +117,7 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
     // if IGN and Illumination are off, go to sleep.
     if( !car_status.mIgnition && !car_status.mLights )
     {
-        Serial.println( "Ignition and lights are off. Going to sleep." );
+        LOG_TRACE( "Ignition and lights are off. Going to sleep." );
         Sleep();
         return;
     }
@@ -128,7 +127,7 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
     {
         if( !LightsAlarmActive )
         {
-            Serial.println( "Ignition is off, but Lights are on. Alarm" );
+            LOG_TRACE( "Ignition is off, but Lights are on. Alarm" );
             LightsAlarmActive = true;
             CarIO::StartBeeper( 4, 1100, 80, 125, 1600 );
             Screens::LightsAlarm lights_alarm;
@@ -143,7 +142,7 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
     {
         if( LightsAlarmActive )
         {
-            Serial.println( "Ignition on, turning off the lights alarm." );
+            LOG_TRACE( "Ignition on, turning off the lights alarm." );
             LightsAlarmActive = false;
             CarIO::StopBeeper();
         }
@@ -152,7 +151,7 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
 
 void Sleep()
 {
-    Serial.println( "going to sleep..." );
+    LOG_TRACE( "going to sleep..." );
     Gps::Sleep();
     gTft->EnableSleep( true );
     esp_sleep_enable_ext1_wakeup( ( 1ull << Pin::Ignition ) | ( 1ull << Pin::Illumination ), ESP_EXT1_WAKEUP_ANY_HIGH );
@@ -170,7 +169,7 @@ void HandleStatusUpdate( const CarIO::CarStatus& car_status )
     if( strcmp( update, StatusCharacteristicValue.c_str() ) != 0 )
     {
         StatusCharacteristicValue = update;
-        Serial.printf( "updating BLE characteristic with %s\n", StatusCharacteristicValue.c_str() );
+        LOG_TRACE( "updating BLE characteristic with %s", StatusCharacteristicValue.c_str() );
         Bluetooth::SetVehicleStatus( StatusCharacteristicValue );
     }
 }
@@ -185,7 +184,7 @@ void loop()
         {
             FwUpdateInProgress = true;
             // update the display
-            Serial.println( "FW Update started. Disabling normal functions." );
+            LOG_TRACE( "FW Update started. Disabling normal functions." );
         }
         return; // don't do anything else while we're updating.
     }
@@ -196,7 +195,7 @@ void loop()
     auto button_events = CarIO::GetButtonEvents();
     if( button_events.mHourButtonPressed )
     {
-        Serial.println( "hour button clicked" );
+        LOG_TRACE( "hour button clicked" );
         // advance current screen by one.
         if( gCurrentScreen == CurrentScreen::Default )
         {
@@ -214,7 +213,7 @@ void loop()
     }
     if( button_events.mMinuteButtonPressed )
     {
-        Serial.println( "minute button clicked" );
+        LOG_TRACE( "minute button clicked" );
     }
     HandlePowerState( car_status );
     HandleStatusUpdate( car_status );

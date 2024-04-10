@@ -4,6 +4,7 @@
 #include "pins.h"
 #include <Adafruit_GFX.h>
 #include "SPIFFS.h"
+#include "logger.h"
 namespace Tft
 {
     namespace
@@ -21,6 +22,7 @@ namespace Tft
 
     void Tft::Init()
     {
+        LOG_TRACE( "Tft::Init()" );
         digitalWrite( Pin::TftPower, 1 );
         delay( 100 );
         mTft.init( 136, 240 );
@@ -29,7 +31,7 @@ namespace Tft
 
         if( !SPIFFS.begin() )
         {
-            Serial.println( "SPIFFS failed" );
+            LOG_ERROR( "SPIFFS failed" );
         }
     }
 

@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "car_io.h"
 #include "pins.h"
+#include "logger.h"
 
 #include <optional>
 
@@ -25,12 +26,13 @@ namespace CarIO
     std::string CarStatus::ToString()
     {
         char display_string[ 128 ] = { 0 };
-        snprintf( display_string, sizeof( display_string ), "B: %f, Ill: %f (%i), IGN: %i, RW: %i, T: %i, R: %i, H: %i, M: %i\n",
+        snprintf( display_string, sizeof( display_string ), "B: %f, Ill: %f (%i), IGN: %i, RW: %i, T: %i, R: %i, H: %i, M: %i",
                   mBatteryVoltage, mIlluminationVoltage, mLights, mIgnition, mRearWindow, mTrunk, mRoof, mHourButton, mMinuteButton );
         return display_string;
     }
     void Setup()
     {
+        LOG_TRACE( "CarIO::Setup()" );
         gpio_hold_dis( static_cast<gpio_num_t>( Pin::TftPower ) );
         pinMode( Pin::TftPower, OUTPUT );
         pinMode( Pin::Battery, INPUT );
@@ -78,8 +80,8 @@ namespace CarIO
         status.mMinuteButton = digitalRead( Pin::Minute ) ? false : true;
 
         // debug for calibration
-        // Serial.printf( "%u\n", battery_code );
-        // Serial.printf( "battery code: %u [%f], lights code: %u [%f]\n", battery_code, status.mBatteryVoltage, illumination_code,
+        // LOG_TRACE( "%u", battery_code );
+        // LOG_TRACE( "battery code: %u [%f], lights code: %u [%f]", battery_code, status.mBatteryVoltage, illumination_code,
         //               status.mIlluminationVoltage );
 
         return status;
@@ -87,9 +89,9 @@ namespace CarIO
 
     void Print( const CarStatus& car_status )
     {
-        Serial.printf( "B: %f, Ill: %f (%i), IGN: %i, RW: %i, T: %i, R: %i, H: %i, M: %i\n", car_status.mBatteryVoltage,
-                       car_status.mIlluminationVoltage, car_status.mLights, car_status.mIgnition, car_status.mRearWindow, car_status.mTrunk,
-                       car_status.mRoof, car_status.mHourButton, car_status.mMinuteButton );
+        LOG_INFO( "B: %f, Ill: %f (%i), IGN: %i, RW: %i, T: %i, R: %i, H: %i, M: %i", car_status.mBatteryVoltage,
+                  car_status.mIlluminationVoltage, car_status.mLights, car_status.mIgnition, car_status.mRearWindow, car_status.mTrunk,
+                  car_status.mRoof, car_status.mHourButton, car_status.mMinuteButton );
     }
 
 

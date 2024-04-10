@@ -1,4 +1,5 @@
 #include "apple_notification_center_service.h"
+#include "logger.h"
 
 #include <BLEClient.h>
 #include <Arduino.h>
@@ -82,8 +83,8 @@ namespace AppleNotifications
 
             void Dump() const
             {
-                Serial.printf( "event id: %hhx, flags: %hhx, category: %hhx, count: %hhx, notification Id: %lu\n", mEventId, mEventFlags,
-                               mCategoryId, mCategoryCount, mNotificationUID );
+                LOG_INFO( "event id: %hhx, flags: %hhx, category: %hhx, count: %hhx, notification Id: %lu", mEventId, mEventFlags,
+                          mCategoryId, mCategoryCount, mNotificationUID );
             }
         };
     }

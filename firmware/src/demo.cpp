@@ -2,6 +2,7 @@
 #include "screens.h"
 #include "tft.h"
 #include "display.h"
+#include "logger.h"
 
 namespace Demo
 {
@@ -9,7 +10,7 @@ namespace Demo
     {
         void DrawScreen( Screens::Screen& screen, Display::Display* display, Tft::Tft* tft, int ms = 3000 )
         {
-            Serial.println( "DrawScreen" );
+            LOG_TRACE( "DrawScreen" );
             screen.Draw( display );
             tft->DrawCanvas( display );
             delay( ms );
