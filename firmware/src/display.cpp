@@ -2,7 +2,7 @@
 #include <SPIFFS_ImageReader.h>
 #include <map>
 #include <string>
-
+#include "logger.h"
 namespace Display
 {
     namespace
@@ -10,7 +10,7 @@ namespace Display
         // cache the loaded images, because image load time is SLOW (5 sec for splash)
         std::map<std::string, SPIFFS_Image> mLoadedImages;
 
-        void DefaultImageLoader( GFXcanvas16* destination, char* path, int16_t x, int16_t y )
+        void DefaultImageLoader( GFXcanvas16* destination, char* path, int16_t x, int16_t y, bool delete_after_draw )
         {
             void* raw_canvas = nullptr;
             if( mLoadedImages.count( path ) == 0 )
@@ -21,16 +21,19 @@ namespace Display
                 if( load_result != IMAGE_SUCCESS )
                 {
                     // failed to load image
+                    Serial.printf( "Failed to load image %s, code: %u\n", path, load_result );
                     return;
                 }
                 auto format = image.getFormat();
                 if( format != IMAGE_16 )
                 {
+                    Serial.printf( "Unsupported image format %u\n", format );
                     return;
                 }
                 raw_canvas = image.getCanvas();
                 if( raw_canvas == nullptr )
                 {
+                    Serial.println( "Failed to get canvas from image" );
                     return;
                 }
             }
@@ -39,12 +42,18 @@ namespace Display
                 raw_canvas = mLoadedImages.at( path ).getCanvas();
                 if( raw_canvas == nullptr )
                 {
+                    Serial.println( "(CACHE) Failed to get canvas from image" );
                     return;
                 }
             }
 
             GFXcanvas16* image_canvas = static_cast<GFXcanvas16*>( raw_canvas );
             destination->drawRGBBitmap( x, y, image_canvas->getBuffer(), image_canvas->width(), image_canvas->height() );
+
+            if( delete_after_draw )
+            {
+                mLoadedImages.erase( path );
+            }
         }
     }
     Display::Display( ImageLoaderFn image_loader )
@@ -64,13 +73,13 @@ namespace Display
         setTextColor( DefaultTextColor );
         setTextWrap( true );
         setFont( nullptr );
-        setTextSize( NormalFontSize );
+        setTextSize( DefaultFontSize );
     }
 
-    void Display::DrawBMP( char* path, int16_t x, int16_t y )
+    void Display::DrawBMP( char* path, int16_t x, int16_t y, bool delete_after_draw )
     {
         assert( mImageLoader != nullptr );
-        mImageLoader( this, path, x, y );
+        mImageLoader( this, path, x, y, delete_after_draw );
     }
 
     // get text position based on some settings. Uses current font settings, etc.

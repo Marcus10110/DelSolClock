@@ -2,9 +2,6 @@
 
 #include <Adafruit_GFX.h>
 
-#include "fonts/digital_7__mono_40pt7b.h"
-#include "Fonts/FreeMono9pt7b.h"
-#include "Fonts/FreeMono12pt7b.h"
 
 namespace Display
 {
@@ -12,16 +9,9 @@ namespace Display
     constexpr int16_t BottomPadding = 10;
     constexpr int16_t LeftPadding = 0;
     constexpr int16_t RightPadding = 0;
-    constexpr int16_t IconPlaceholderWidth = 70;
     constexpr uint16_t DefaultTextColor = 0xFFFF;
     constexpr uint16_t DefaultBackgroundColor = 0x0000;
-
-    constexpr uint8_t TimeFontSize = 1;
-    constexpr GFXfont const* TimeFont = &digital_7__mono_40pt7b;
-    constexpr uint8_t NormalFontSize = 1;
-    constexpr GFXfont const* NormalFont = &FreeMono9pt7b;
-    constexpr uint8_t SpeedFontSize = 2;
-    constexpr uint8_t MusicFontSize = 2;
+    constexpr uint8_t DefaultFontSize = 1;
 
     enum class HorizontalAlignment
     {
@@ -38,20 +28,20 @@ namespace Display
 
     struct Rect
     {
-        int16_t x;
-        int16_t y;
-        int16_t w;
-        int16_t h;
+        int16_t x{ 0 };
+        int16_t y{ 0 };
+        int16_t w{ 0 };
+        int16_t h{ 0 };
     };
 
     class Display : public GFXcanvas16
     {
-        typedef void ( *ImageLoaderFn )( GFXcanvas16* destination, char* path, int16_t x, int16_t y );
+        typedef void ( *ImageLoaderFn )( GFXcanvas16* destination, char* path, int16_t x, int16_t y, bool delete_after_draw );
 
       public:
         Display( ImageLoaderFn image_loader = nullptr );
         void clear();
-        void DrawBMP( char* path, int16_t x, int16_t y );
+        void DrawBMP( char* path, int16_t x, int16_t y, bool delete_after_draw = false );
         void GetTextLocation( const char* text, HorizontalAlignment horizontal, VerticalAlignment vertical, int16_t* left, int16_t* top,
                               Rect* within_region = nullptr, Rect* text_region = nullptr );
         void WriteAligned( const char* text, HorizontalAlignment horizontal, VerticalAlignment vertical, Rect* within_region = nullptr,

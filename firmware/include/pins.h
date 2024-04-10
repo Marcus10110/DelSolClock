@@ -30,7 +30,7 @@ namespace Pin
 #ifdef REV2
     constexpr int8_t GpsRx = 16;
     constexpr int8_t GpsTx = 17;
-#elif
+#else
     // (note, these are the default I2C pins)
     constexpr int8_t GpsRx = 22;
     constexpr int8_t GpsTx = 23;

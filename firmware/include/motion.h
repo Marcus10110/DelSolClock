@@ -7,9 +7,9 @@ namespace Motion
 {
     struct State
     {
-        float mForward; // X
-        float mLeft; // Y
-        float mUp; // Z
+        float mForward{ 0 }; // X
+        float mLeft{ 0 };    // Y
+        float mUp{ 0 };      // Z
         bool mValid{ false };
     };
 

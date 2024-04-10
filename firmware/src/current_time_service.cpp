@@ -45,6 +45,7 @@ namespace CurrentTimeService
             case CurrentTime::DayOfWeek::Sunday:
                 return "Sunday";
             }
+            return "Unknown";
         }
 
         CurrentTime ParseCurrentTime( const uint8_t* data, size_t length )
@@ -104,7 +105,9 @@ namespace CurrentTimeService
             auto data = gCurrentTimeCharacteristic->readValue();
             auto time = ParseCurrentTime( reinterpret_cast<const uint8_t*>( data.data() ), data.size() );
             *current_time = time;
+            return true;
         }
+        return false;
     }
 
     bool StartTimeService( BLEClient* client, CurrentTime* current_time )

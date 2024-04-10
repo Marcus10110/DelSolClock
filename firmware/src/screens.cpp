@@ -7,13 +7,8 @@
 #include <SPIFFS_ImageReader.h>
 #include <string>
 
-#include "Fonts/FreeMono9pt7b.h"
-#include "Fonts/FreeMono12pt7b.h"
-#include "fonts/JetBrainsMono_Regular8pt7b.h"
-#include "fonts/JetBrainsMono_Regular10pt7b.h"
-#include "fonts/JetBrainsMono_Regular12pt7b.h"
+#include "fonts/digital_7__mono_40pt7b.h"
 
-#include "fonts/JetBrainsMono_Thin6pt7b.h"
 #include "fonts/JetBrainsMono_Thin7pt7b.h"
 #include "fonts/JetBrainsMono_Thin8pt7b.h"
 #include "fonts/JetBrainsMono_Thin9pt7b.h"
@@ -21,7 +16,7 @@
 #include "fonts/JetBrainsMono_Thin12pt7b.h"
 #include "fonts/JetBrainsMono_Thin14pt7b.h"
 #include "fonts/JetBrainsMono_Thin16pt7b.h"
-#include "fonts/JetBrainsMono_Thin18pt7b.h"
+
 using namespace Display;
 
 namespace Screens
@@ -29,7 +24,7 @@ namespace Screens
     void Splash::Draw( Display::Display* display )
     {
         display->clear();
-        display->DrawBMP( "/OldSols.bmp", 0, 0 );
+        display->DrawBMP( "/OldSols.bmp", 0, 0, true );
     }
 
     void Clock::Draw( Display::Display* display )
@@ -53,7 +48,7 @@ namespace Screens
 
         char display_string[ 128 ] = { 0 };
         snprintf( display_string, sizeof( display_string ), "%i:%02i", hours12, mMinutes );
-        display->setFont( TimeFont );
+        display->setFont( &digital_7__mono_40pt7b );
         display->setTextSize( 1 );
         display->setTextWrap( false ); // disable wrap just for this function.
         int16_t x, y;
@@ -325,6 +320,7 @@ namespace Screens
 
     void FontTest::Draw( Display::Display* display )
     {
+#if 0
         display->clear();
         display->setFont( nullptr );
         int16_t x = 0;
@@ -365,5 +361,6 @@ namespace Screens
         test( "FreeMono 9 0.123", &FreeMono9pt7b, 1 );
         y += 10;
         test( "FreeMono 12 0.123", &FreeMono12pt7b, 1 );
+#endif
     }
 }

@@ -53,8 +53,6 @@ void setup()
     Serial.begin( 115200 );
     Serial.println( "Del Sol Clock Booting" );
 
-    Serial.println( "setup, bluetooth begin..." );
-    Bluetooth::Begin( BluetoothDeviceName );
 
     // Required before we can handle the lights-only power mode.
     CarIO::Setup();
@@ -64,12 +62,17 @@ void setup()
     Motion::Begin();
 
     {
-        // show splash screen.
+        // write the splash screen to the display buffer before starting BLE. this uses a huge amount of RAM temporarily.
         Screens::Splash splash;
         splash.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
-        delay( 3000 );
     }
+
+    Serial.println( "setup, bluetooth begin..." );
+    Bluetooth::Begin( BluetoothDeviceName );
+    // leave splash screen up for a few seconds.
+    delay( 3000 );
+
 
 #ifdef DEMO_MODE
     while( 1 )

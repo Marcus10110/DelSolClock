@@ -128,7 +128,7 @@ namespace AppleMediaService
             uint8_t entity_id = data[ 0 ];
             uint8_t attribute_id = data[ 1 ];
             uint8_t flags = data[ 2 ];
-            std::string value( ( char* )data + 3, length - 3 );
+            std::string value( reinterpret_cast<char*>( data ) + 3, length - 3 );
             log_d( "entity update. id: %i, attribute: %i, flags: %i, value: %s", entity_id, attribute_id, flags, value.c_str() );
             switch( entity_id )
             {
