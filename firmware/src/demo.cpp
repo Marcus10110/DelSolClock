@@ -29,11 +29,6 @@ namespace Demo
         }
 
         {
-            Screens::FontTest font_test;
-            DrawScreen( font_test, display, tft );
-        }
-
-        {
             Screens::Discoverable discoverable;
             discoverable.mBluetoothName = "Del Sol";
             DrawScreen( discoverable, display, tft );

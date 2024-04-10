@@ -100,12 +100,4 @@ namespace Screens
             void Draw( Display::Display* display ) override;
         };
     }
-
-
-    class FontTest : public Screen
-    {
-      public:
-        void Draw( Display::Display* display ) override;
-    };
-
 }
