@@ -519,7 +519,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2dafd93c-dcc6-41b0-a485-40b9729c6ff8")
-		(property "Reference" "#PWR046"
+		(property "Reference" "#PWR042"
 			(at 142.24 114.3 0)
 			(effects
 				(font
@@ -605,7 +605,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "9b52ff8c-e06c-4586-8705-dffc264901e9")
-		(property "Reference" "R31"
+		(property "Reference" "R23"
 			(at 144.018 102.0353 0)
 			(effects
 				(font
@@ -695,7 +695,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "be3da4f7-9261-4e35-a024-ac6088d30b64")
-		(property "Reference" "R30"
+		(property "Reference" "R22"
 			(at 144.018 90.6053 0)
 			(effects
 				(font
@@ -785,7 +785,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d4d3eebf-58fd-42ae-9232-8d5707196b0a")
-		(property "Reference" "D9"
+		(property "Reference" "D5"
 			(at 134.112 102.0353 90)
 			(effects
 				(font
