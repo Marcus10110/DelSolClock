@@ -1,0 +1,2 @@
+# set the RTC clock soruce to an external 32KHz crystal.
+CONFIG_RTC_CLK_SRC_EXT_CRYS=y
