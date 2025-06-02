@@ -216,7 +216,7 @@ namespace Bluetooth
 
             time.Dump();
 // Apple Notification Service disabled, not used.
-#if 0
+#if 1
             if( !AppleNotifications::StartNotificationService( Client ) )
             {
                 LOG_ERROR( "failed to start the notification service" );
@@ -253,7 +253,7 @@ namespace Bluetooth
         uint8_t address_type;
         if( esp_ble_gap_get_local_used_addr( local_address, &address_type ) == ESP_OK )
         {
-            LOG_DEBUG( "public device address:  %02X %02X %02X %02X %02X %02X %02X %02X. Type: %u", local_address[ 0 ], local_address[ 1 ],
+            LOG_DEBUG( "local use address:  %02X %02X %02X %02X %02X %02X %02X %02X. Type: %u", local_address[ 0 ], local_address[ 1 ],
                        local_address[ 2 ], local_address[ 3 ], local_address[ 4 ], local_address[ 5 ], address_type );
         }
         else

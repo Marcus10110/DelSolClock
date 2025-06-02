@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "display.h"
+#include "apple_notification_center_service.h"
 
 namespace Screens
 {
@@ -66,6 +67,22 @@ namespace Screens
       public:
         void Draw( Display::Display* display ) override;
         uint32_t mBytesReceived;
+    };
+
+    class Notifications : public Screen
+    {
+      public:
+        bool mHasNotification;
+        AppleNotifications::DisplayNotification mNotification;
+        void Draw( Display::Display* display ) override;
+    };
+
+    class Navigation : public Screen
+    {
+      public:
+        bool mHasNotification;
+        AppleNotifications::DisplayNotification mNotification;
+        void Draw( Display::Display* display ) override;
     };
 
     namespace QuarterMile

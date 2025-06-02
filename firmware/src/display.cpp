@@ -22,6 +22,10 @@ namespace Display
                 {
                     // failed to load image
                     LOG_ERROR( "Failed to load image %s, code: %u", path, load_result );
+                    if( load_result == IMAGE_ERR_MALLOC )
+                    {
+                        LOG_INFO( "free memory: %d", ESP.getFreeHeap() );
+                    }
                     return;
                 }
                 auto format = image.getFormat();

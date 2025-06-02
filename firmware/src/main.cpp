@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "apple_media_service.h"
+#include "apple_notification_center_service.h"
 #include "current_time_service.h"
 #include "apple_media_service.h"
 #include "tft.h"
@@ -20,12 +21,16 @@
 #include <time.h>
 #include <sys/time.h>
 
+#include "soc/rtc.h"
+
 
 enum class CurrentScreen
 {
     Default, // clock, OTA, splash, etc.
     Status,
     QM,
+    Notifications,
+    Navigation,
 };
 
 
@@ -54,6 +59,11 @@ void setup()
     Serial.begin( 115200 );
     LOG_TRACE( "Del Sol Clock Booting" );
 
+    // show the current clock source. If it's not 1 (the external 32kHz crystal), then either (A) the crystal is not present, or (B) the
+    // bootloader & esp32-arduino library was not configured for it.
+    auto src = rtc_clk_slow_freq_get();
+    auto hz = rtc_clk_slow_freq_get_hz();
+    LOG_TRACE( "RTC_SLOW_CLK frequency: %u Hz, source: %i", hz, src );
 
     // Required before we can handle the lights-only power mode.
     CarIO::Setup();
@@ -189,6 +199,9 @@ void loop()
         return; // don't do anything else while we're updating.
     }
     Bluetooth::Service();
+#if 1
+    AppleNotifications::Service();
+#endif
     Gps::Service();
     CarIO::Service();
     auto car_status = CarIO::GetStatus();
@@ -207,6 +220,14 @@ void loop()
             QuarterMile::Reset();
         }
         else if( gCurrentScreen == CurrentScreen::QM )
+        {
+            gCurrentScreen = CurrentScreen::Notifications;
+        }
+        else if( gCurrentScreen == CurrentScreen::Notifications )
+        {
+            gCurrentScreen = CurrentScreen::Navigation;
+        }
+        else if( gCurrentScreen == CurrentScreen::Navigation )
         {
             gCurrentScreen = CurrentScreen::Default;
         }
@@ -273,6 +294,22 @@ void loop()
     else if( gCurrentScreen == CurrentScreen::QM )
     {
         QuarterMile::Service( &gDisplay, gTft, button_events, Gps::GetGps() );
+    }
+    else if( gCurrentScreen == CurrentScreen::Notifications )
+    {
+#if 1
+        Screens::Notifications notifications;
+        notifications.mHasNotification = AppleNotifications::GetLatestNotification( notifications.mNotification );
+        notifications.Draw( &gDisplay );
+        gTft->DrawCanvas( &gDisplay );
+#endif
+    }
+    else if( gCurrentScreen == CurrentScreen::Navigation )
+    {
+        Screens::Navigation navigation;
+        navigation.mHasNotification = AppleNotifications::GetLatestNavigationNotification( navigation.mNotification );
+        navigation.Draw( &gDisplay );
+        gTft->DrawCanvas( &gDisplay );
     }
     delay( 10 );
 }

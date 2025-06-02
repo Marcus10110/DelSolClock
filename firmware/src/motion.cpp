@@ -14,7 +14,7 @@ namespace Motion
         LOG_TRACE( "Motion::Begin()" );
         if( !Sensor.begin_I2C() )
         {
-            while( true )
+            while( !Sensor.begin_I2C() )
             {
                 LOG_ERROR( "failed to start I2C motion sensor" );
                 delay( 1000 );

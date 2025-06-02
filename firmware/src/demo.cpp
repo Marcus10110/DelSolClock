@@ -20,6 +20,38 @@ namespace Demo
     void Demo( Display::Display* display, Tft::Tft* tft )
     {
         {
+            Screens::Navigation left;
+            left.mHasNotification = true;
+            left.mNotification.mMessage = "Turn left onto Eucalyptus Dr";
+            DrawScreen( left, display, tft );
+        }
+        {
+            Screens::Navigation right;
+            right.mHasNotification = true;
+            right.mNotification.mMessage = "Turn right onto Eucalyptus Dr";
+            DrawScreen( right, display, tft );
+        }
+        {
+            Screens::Navigation complex;
+            complex.mHasNotification = true;
+            complex.mNotification.mMessage =
+                "Keep right, follow signs for Golden Gate National Cemetery/VA Clinic and merge onto Sneath Ln";
+            DrawScreen( complex, display, tft );
+        }
+        {
+            Screens::Navigation complex;
+            complex.mHasNotification = true;
+            complex.mNotification.mMessage = "Use the right 3 lanes to turn slightly right onto CA-1 S/Junipero Serra Blvd";
+            DrawScreen( complex, display, tft );
+        }
+        {
+            Screens::Navigation complex;
+            complex.mHasNotification = true;
+            complex.mNotification.mMessage = "Take exit 43B for Sneath Lane";
+            DrawScreen( complex, display, tft );
+        }
+
+        {
             Screens::OtaInProgress ota;
 
             for( uint32_t i = 0; i < 10000; i += 99 )

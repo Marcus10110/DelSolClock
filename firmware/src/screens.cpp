@@ -7,14 +7,15 @@
 #include <SPIFFS_ImageReader.h>
 #include <string>
 
+// the adafruit font converter converts fonts at 141 DPI.
+// pixel size = pt size / 72 * 141.
 #include "fonts/digital_7__mono_40pt7b.h"
-
 #include "fonts/JetBrainsMono_Thin7pt7b.h"
 #include "fonts/JetBrainsMono_Thin8pt7b.h"
 #include "fonts/JetBrainsMono_Thin9pt7b.h"
-#include "fonts/JetBrainsMono_Thin10pt7b.h"
+#include "fonts/JetBrainsMono_Thin10pt7b.h" // Capital N is 14px tall.
 #include "fonts/JetBrainsMono_Thin12pt7b.h"
-#include "fonts/JetBrainsMono_Thin14pt7b.h"
+#include "fonts/JetBrainsMono_Thin14pt7b.h" // Capital N is 20px tall.
 #include "fonts/JetBrainsMono_Thin16pt7b.h"
 
 using namespace Display;
@@ -210,6 +211,95 @@ namespace Screens
         display->WriteAligned( "Updating", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
         display->setFont( &JetBrainsMono_Thin10pt7b );
         display->WriteAligned( buffer, Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+    }
+
+    void Notifications::Draw( Display::Display* display )
+    {
+        display->clear();
+        if( !mHasNotification )
+        {
+            display->setFont( &JetBrainsMono_Thin14pt7b );
+            display->WriteAligned( "Notifications", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
+            display->setFont( &JetBrainsMono_Thin10pt7b );
+            display->WriteAligned( "No Notifications", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+            return;
+        }
+
+        display->setFont( &JetBrainsMono_Thin14pt7b );
+        display->WriteAligned( "Notifications", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
+
+        String summary = mNotification.mTitle + "\n" + mNotification.mSubtitle + "\n" + mNotification.mMessage;
+
+        display->setFont( &JetBrainsMono_Thin7pt7b );
+        display->WriteAligned( summary.c_str(), Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+    }
+
+    void Navigation::Draw( Display::Display* display )
+    {
+        display->clear();
+
+        display->setFont( &JetBrainsMono_Thin14pt7b );
+        display->WriteAligned( "Navigation", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
+
+        if( !mHasNotification )
+        {
+            display->setFont( &JetBrainsMono_Thin10pt7b );
+            display->WriteAligned( "No Notifications", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+            return;
+        }
+
+        const char* left_prefix = "Turn left onto";
+        const char* right_prefix = "Turn right onto";
+        bool is_left = mNotification.mMessage.startsWith( left_prefix );
+        bool is_right = mNotification.mMessage.startsWith( right_prefix );
+
+        if( !is_left && !is_right )
+        {
+            // display the contents in the center.
+            if( mNotification.mMessage.length() <= 60 )
+            {
+                display->setFont( &JetBrainsMono_Thin10pt7b );
+            }
+            else if( mNotification.mMessage.length() <= 80 )
+            {
+                display->setFont( &JetBrainsMono_Thin9pt7b );
+            }
+            else
+            {
+                display->setFont( &JetBrainsMono_Thin8pt7b );
+            }
+            display->WriteAligned( mNotification.mMessage.c_str(), Display::HorizontalAlignment::Center,
+                                   Display::VerticalAlignment::Center );
+            return;
+        }
+
+        // draw an arrow on the right side of the screen.
+        const int bmp_size = 80; // 80x80 pixels
+        auto screen_rect = display->ScreenRect();
+        int top_height = 20;
+        screen_rect.y += top_height;
+        screen_rect.h -= top_height;
+        if( is_left )
+        {
+            display->DrawBMP( "/left.bmp", screen_rect.x + screen_rect.w - bmp_size, screen_rect.y + ( screen_rect.h - bmp_size ) / 2 );
+        }
+        else if( is_right )
+        {
+            display->DrawBMP( "/right.bmp", screen_rect.x + screen_rect.w - bmp_size, screen_rect.y + ( screen_rect.h - bmp_size ) / 2 );
+        }
+        // write the text on the left side of the screen.
+        String line1 = is_left ? left_prefix : right_prefix;
+        String line2 = mNotification.mMessage.substring( is_left ? strlen( left_prefix ) : strlen( right_prefix ) );
+        line2.trim();
+        // line 1 in 8pt, line 2 in 10pt.
+        display->setFont( &JetBrainsMono_Thin8pt7b );
+        display->setCursor( 0, top_height + 26 );
+        display->write( line1.c_str() );
+        display->write( "\n" );
+        // display->WriteAligned( line1.c_str(), Display::HorizontalAlignment::Left, Display::VerticalAlignment::Center );
+
+        display->setFont( &JetBrainsMono_Thin10pt7b );
+        display->write( line2.c_str() );
     }
 
     namespace QuarterMile
