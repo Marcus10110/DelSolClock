@@ -1,33 +1,67 @@
-﻿using System;
+﻿using RestSharp;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json.Serialization;
 
-namespace DelSolClockAppMaui.Services
+namespace DelSolClockAppMaui.Services;
+
+public class FirmwareBrowser
 {
-    internal class FirmwareBrowser
+    public class Release
     {
-        public static readonly Guid DelSolVehicleServiceGuid = new Guid( "8fb88487-73cf-4cce-b495-505a4b54b802" );
-        public static readonly Guid DelSolStatusCharacteristicGuid = new Guid( "40d527f5-3204-44a2-a4ee-d8d3c16f970e" );
-        public static readonly Guid DelSolBatteryCharacteristicGuid = new Guid( "5c258bb8-91fc-43bb-8944-b83d0edc9b43" );
+        [JsonPropertyName( "url" )]
+        public string Url { get; set; }
 
-        public static readonly Guid DelSolLocationServiceGuid = new Guid( "61d33c70-e3cd-4b31-90d8-a6e14162fffd" );
-        public static readonly Guid DelSolNavigationServiceGuid = new Guid( "77f5d2b5-efa1-4d55-b14a-cc92b72708a0" );
+        [JsonPropertyName( "html_url" )]
+        public string HtmlUrl { get; set; }
 
-        public static readonly Guid DelSolFirmwareServiceGuid = new Guid( "69da0f2b-43a4-4c2a-b01d-0f11564c732b" );
-        public static readonly Guid DelSolFirmwareWriteCharacteristicGuid = new Guid( "7efc013a-37b7-44da-8e1c-06e28256d83b" );
-        public static readonly Guid DelSolFirmwareVersionCharacteristicGuid = new Guid( "a5c0d67a-9576-47ea-85c6-0347f8473cf3" );
+        [JsonPropertyName( "tag_name" )]
+        public string TagName { get; set; }
 
-        public bool IsConnected
+        [JsonPropertyName( "name" )]
+        public string Name { get; set; }
+
+        [JsonPropertyName( "body" )]
+        public string Body { get; set; }
+
+        [JsonPropertyName( "created_at" )]
+        public DateTime CreatedAt { get; set; }
+
+        [JsonPropertyName( "published_at" )]
+        public DateTime PublishedAt { get; set; }
+
+        [JsonPropertyName( "assets_url" )]
+        public string AssetsUrl { get; set; }
+
+        [JsonPropertyName( "assets" )]
+        public List<Asset> Assets { get; set; }
+
+        public class Asset
         {
-            get
-            {
-                // TODO
-                return true;
-            }
+            [JsonPropertyName( "name" )]
+            public string Name { get; set; }
+
+            [JsonPropertyName( "size" )]
+            public int Size { get; set; }
+
+            [JsonPropertyName( "browser_download_url" )]
+            public string BrowserDownloadUrl { get; set; }
         }
+    }
 
+    public static async Task<List<Release>> FetchReleasesAsync( string repoOwner, string repoName )
+    {
+        var options = new RestClientOptions( "https://api.github.com" )
+        {
+            ThrowOnAnyError = true
+        };
+        var client = new RestClient( options );
 
+        var request = new RestRequest( $"/repos/{repoOwner}/{repoName}/releases" )
+            .AddHeader( "User-Agent", "DelSolClockAppMaui" );
+
+        var response = await client.GetAsync<List<Release>>( request );
+        return response ?? [];
     }
 }

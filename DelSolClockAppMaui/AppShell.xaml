@@ -1,23 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<Shell
-    x:Class="DelSolClockAppMaui.AppShell"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:DelSolClockAppMaui"
-    Shell.FlyoutBehavior="Flyout"
-    Title="DelSolClockAppMaui">
-
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:pages="clr-namespace:DelSolClockAppMaui.Pages"
+       x:Class="DelSolClockAppMaui.AppShell">
     <TabBar>
-        <Tab Title="Main">
-            <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
-        </Tab>
-        <Tab Title="Second">
-            <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
-        </Tab>
+        <ShellContent Title="Status" ContentTemplate="{DataTemplate pages:StatusPage}" />
+        <ShellContent Title="Firmware" ContentTemplate="{DataTemplate pages:UpdatePage}" />
+        <ShellContent Title="Logs" ContentTemplate="{DataTemplate pages:LogPage}" />
     </TabBar>
-    <!--<ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />-->
-
 </Shell>
