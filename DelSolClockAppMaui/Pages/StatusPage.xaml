@@ -1,9 +1,174 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="DelSolClockAppMaui.Pages.StatusPage">
-    <StackLayout Padding="20">
-        <Label x:Name="StatusLabel" FontSize="Large" />
-        <ListView x:Name="DataList" />
-    </StackLayout>
+             x:Class="DelSolClockAppMaui.Pages.StatusPage"
+             Title="Device Status">
+    
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <x:String x:Key="ConnectText">Connect</x:String>
+            <x:String x:Key="ConnectingText">Connecting...</x:String>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+    
+    <ScrollView>
+        <StackLayout Padding="16" Spacing="16">
+            
+            <!-- Connection Status Card -->
+            <Frame BackgroundColor="LightBlue" Padding="16" HasShadow="True">
+                <StackLayout>
+                    <StackLayout Orientation="Horizontal">
+                        <Label x:Name="ConnectionStatusLabel" 
+                               Text="Not Connected" 
+                               FontSize="18" 
+                               FontAttributes="Bold"
+                               VerticalOptions="Center" 
+                               HorizontalOptions="FillAndExpand"/>
+                        <ActivityIndicator x:Name="ConnectionSpinner" 
+                                         IsVisible="False" 
+                                         IsRunning="False"/>
+                    </StackLayout>
+                    
+                    <Label x:Name="DeviceInfoLabel" 
+                           Text="Firmware: Unknown" 
+                           FontSize="14" 
+                           IsVisible="False"/>
+                           
+                    <StackLayout Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                        <Button x:Name="ScanButton" 
+                                Text="Scan for Devices" 
+                                Clicked="OnScanButtonClicked"/>
+                        <Button x:Name="KnownDevicesButton" 
+                                Text="Known Devices" 
+                                Clicked="OnKnownDevicesButtonClicked"/>
+                        <Button x:Name="DisconnectButton" 
+                                Text="Disconnect" 
+                                IsVisible="False"
+                                BackgroundColor="Orange"
+                                Clicked="OnDisconnectButtonClicked"/>
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+
+            <!-- Vehicle Status Card (only when connected) -->
+            <Frame x:Name="VehicleStatusCard" 
+                   BackgroundColor="LightGreen" 
+                   Padding="16" 
+                   HasShadow="True" 
+                   IsVisible="False">
+                <StackLayout>
+                    <Label Text="Vehicle Status" FontSize="18" FontAttributes="Bold"/>
+                    
+                    <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,*" RowSpacing="8">
+                        <!-- Row 1 -->
+                        <StackLayout Orientation="Horizontal" Grid.Row="0" Grid.Column="0">
+                            <Label Text="🚗" FontSize="16"/>
+                            <Label x:Name="WindowStatusLabel" Text="Window: UP" FontSize="14"/>
+                        </StackLayout>
+                        <StackLayout Orientation="Horizontal" Grid.Row="0" Grid.Column="1">
+                            <Label Text="🔋" FontSize="16"/>
+                            <Label x:Name="BatteryStatusLabel" Text="Battery: --V" FontSize="14"/>
+                        </StackLayout>
+                        
+                        <!-- Row 2 -->
+                        <StackLayout Orientation="Horizontal" Grid.Row="1" Grid.Column="0">
+                            <Label Text="📦" FontSize="16"/>
+                            <Label x:Name="TrunkStatusLabel" Text="Trunk: CLOSED" FontSize="14"/>
+                        </StackLayout>
+                        <StackLayout Orientation="Horizontal" Grid.Row="1" Grid.Column="1">
+                            <Label Text="💡" FontSize="16"/>
+                            <Label x:Name="LightsStatusLabel" Text="Lights: OFF" FontSize="14"/>
+                        </StackLayout>
+                        
+                        <!-- Row 3 -->
+                        <StackLayout Orientation="Horizontal" Grid.Row="2" Grid.Column="0">
+                            <Label Text="🏠" FontSize="16"/>
+                            <Label x:Name="RoofStatusLabel" Text="Roof: UP" FontSize="14"/>
+                        </StackLayout>
+                        <StackLayout Orientation="Horizontal" Grid.Row="2" Grid.Column="1">
+                            <Label Text="🔥" FontSize="16"/>
+                            <Label x:Name="IgnitionStatusLabel" Text="Ignition: OFF" FontSize="14"/>
+                        </StackLayout>
+                    </Grid>
+                    
+                    <Label x:Name="LastUpdatedLabel" 
+                           Text="Last Updated: Never" 
+                           FontSize="12" 
+                           HorizontalOptions="Center"
+                           Margin="0,8,0,0"/>
+                </StackLayout>
+            </Frame>
+
+            <!-- Device Discovery List -->
+            <Frame x:Name="DeviceListCard" 
+                   BackgroundColor="LightYellow" 
+                   Padding="16" 
+                   HasShadow="True" 
+                   IsVisible="False">
+                <StackLayout>
+                    <StackLayout Orientation="Horizontal">
+                        <Label x:Name="ScanStatusLabel" 
+                               Text="Available Devices" 
+                               FontSize="18" 
+                               FontAttributes="Bold"
+                               HorizontalOptions="FillAndExpand"/>
+                        <Button x:Name="CancelScanButton" 
+                                Text="Cancel" 
+                                IsVisible="False"
+                                BackgroundColor="Red"
+                                TextColor="White"
+                                Clicked="OnCancelScanButtonClicked"/>
+                    </StackLayout>
+                    
+                    <CollectionView x:Name="DeviceCollectionView" 
+                                   ItemsSource="{Binding DiscoveredDevices}"
+                                   SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="8,12" ColumnDefinitions="*,Auto" BackgroundColor="White" Margin="0,4">
+                                    <StackLayout Grid.Column="0" Spacing="4">
+                                        <StackLayout Orientation="Horizontal">
+                                            <Label Text="{Binding Name}" 
+                                                   FontAttributes="Bold" 
+                                                   FontSize="16"
+                                                   TextColor="Black"
+                                                   HorizontalOptions="Start"/>
+                                            <Label Text="(Known)" 
+                                                   FontSize="12" 
+                                                   TextColor="Green"
+                                                   FontAttributes="Bold"
+                                                   IsVisible="{Binding IsKnownDevice}"/>
+                                        </StackLayout>
+                                        <Label Text="{Binding SignalStrength, StringFormat='Signal: {0} dBm'}" 
+                                               FontSize="12" 
+                                               TextColor="Gray"/>
+                                        <Label Text="{Binding LastSeen, StringFormat='Last seen: {0:HH:mm:ss}'}" 
+                                               FontSize="12" 
+                                               TextColor="Gray"/>
+                                    </StackLayout>
+                                    <Button Grid.Column="1" 
+                                            Text="Connect" 
+                                            BackgroundColor="Green"
+                                            TextColor="White"
+                                            CommandParameter="{Binding .}"
+                                            Clicked="OnConnectDeviceButtonClicked"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </StackLayout>
+            </Frame>
+
+            <!-- Help Text (when disconnected) -->
+            <Frame x:Name="HelpCard" 
+                   BackgroundColor="LightGray" 
+                   Padding="16" 
+                   HasShadow="False">
+                <Label Text="Connect to your Del Sol device to see vehicle status and monitor your car in real-time." 
+                       HorizontalOptions="Center"
+                       FontAttributes="Italic"/>
+            </Frame>
+            
+        </StackLayout>
+    </ScrollView>
 </ContentPage>
