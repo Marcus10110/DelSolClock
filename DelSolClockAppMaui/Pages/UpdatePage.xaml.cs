@@ -31,11 +31,19 @@ public partial class UpdatePage : ContentPage
     private async void LoadReleases()
     {
         Debug.WriteLine( "Loading releases..." );
+        
+        // Show loading state
+        LoadingCard.IsVisible = true;
+        LoadingSpinner.IsRunning = true;
+        EmptyStateCard.IsVisible = false;
+        RefreshButton.IsEnabled = false;
+        
         try
         {
             Items.Clear();
             var releases = await FirmwareBrowser.FetchReleasesAsync( "Marcus10110", "DelSolClock" );
             Debug.WriteLine( releases );
+            
             foreach( var r in releases )
             {
                 var asset = r.Assets.FirstOrDefault( a => a.Name.EndsWith( ".bin" ) );
@@ -51,34 +59,72 @@ public partial class UpdatePage : ContentPage
                     } );
                 }
             }
+            
+            // Show empty state if no releases found
+            if( Items.Count == 0 )
+            {
+                EmptyStateCard.IsVisible = true;
+            }
         }
         catch( Exception ex )
         {
-            await DisplayAlert( "Error", ex.Message, "OK" );
+            await DisplayAlert( "Error Loading Releases", ex.Message, "OK" );
+            EmptyStateCard.IsVisible = true;
         }
         finally
         {
-            FirmwareRefreshView.IsRefreshing = false;
+            // Hide loading state
+            LoadingCard.IsVisible = false;
+            LoadingSpinner.IsRunning = false;
+            RefreshButton.IsEnabled = true;
         }
     }
 
-    private void OnUpdateClicked( object sender, EventArgs e )
-    {
-        if( sender is Button button && button.CommandParameter is string url && _ble.Connected )
-        {
-            _ble.StartFirmwareUpdate( url );
-        }
-    }
-
-    private void OnViewOnlineClicked( object sender, EventArgs e )
+    private async void OnUpdateClicked( object sender, EventArgs e )
     {
         if( sender is Button button && button.CommandParameter is string url )
         {
-            try { Launcher.Default.OpenAsync( url ); } catch { }
+            // Check if device is connected (temporarily disabled until we integrate DelSolDevice)
+            if( !_ble.Connected )
+            {
+                await DisplayAlert( "Not Connected", "Please connect to a device first on the Status page", "OK" );
+                return;
+            }
+            
+            // Show update progress
+            UpdateProgressCard.IsVisible = true;
+            UpdateProgressBar.Progress = 0;
+            UpdateStatusLabel.Text = "Starting firmware update...";
+            
+            try
+            {
+                // TODO: Replace with DelSolDevice integration
+                _ble.StartFirmwareUpdate( url );
+            }
+            catch( Exception ex )
+            {
+                await DisplayAlert( "Update Error", $"Failed to start firmware update: {ex.Message}", "OK" );
+                UpdateProgressCard.IsVisible = false;
+            }
         }
     }
 
-    private void OnRefreshing( object sender, EventArgs e )
+    private async void OnViewOnlineClicked( object sender, EventArgs e )
+    {
+        if( sender is Button button && button.CommandParameter is string url )
+        {
+            try 
+            { 
+                await Launcher.Default.OpenAsync( url ); 
+            } 
+            catch( Exception ex )
+            {
+                await DisplayAlert( "Error", $"Could not open URL: {ex.Message}", "OK" );
+            }
+        }
+    }
+
+    private void OnRefreshClicked( object sender, EventArgs e )
     {
         _loaded = false;
         LoadReleases();
@@ -86,10 +132,10 @@ public partial class UpdatePage : ContentPage
 
     public class UpdateItem
     {
-        public string Name { get; set; }
-        public string Body { get; set; }
+        public required string Name { get; set; }
+        public required string Body { get; set; }
         public DateTime PublishedAt { get; set; }
-        public string AssetUrl { get; set; }
-        public string HtmlUrl { get; set; }
+        public required string AssetUrl { get; set; }
+        public required string HtmlUrl { get; set; }
     }
 }
