@@ -1,3 +1,5 @@
+
+
 #include <Arduino.h>
 #include "apple_media_service.h"
 #include "apple_notification_center_service.h"
@@ -31,6 +33,7 @@ enum class CurrentScreen
     QM,
     Notifications,
     Navigation,
+    GMeter,
 };
 
 
@@ -47,7 +50,10 @@ namespace
 
     Tft::Tft* gTft;
     Display::Display gDisplay;
-    CurrentScreen gCurrentScreen = CurrentScreen::Default;
+    CurrentScreen gCurrentScreen = CurrentScreen::GMeter;
+
+    Motion::HistoryTracker BrakeHistoryTracker( Screens::GMeter::HistorySize, 100 );
+    Motion::HistoryTracker LateralHistoryTracker( Screens::GMeter::HistorySize, 100 );
 }
 
 void HandlePowerState( const CarIO::CarStatus& car_status );
@@ -58,6 +64,8 @@ void setup()
 {
     Serial.begin( 115200 );
     LOG_TRACE( "Del Sol Clock Booting" );
+
+    LOG_TRACE( "free memory: %d", ESP.getFreeHeap() );
 
     // show the current clock source. If it's not 1 (the external 32kHz crystal), then either (A) the crystal is not present, or (B) the
     // bootloader & esp32-arduino library was not configured for it.
@@ -71,12 +79,14 @@ void setup()
     gTft->Init();
     Gps::Begin();
     Motion::Begin();
+    Screens::PreloadImages();
 
     {
         // write the splash screen to the display buffer before starting BLE. this uses a huge amount of RAM temporarily.
-        Screens::Splash splash;
-        splash.Draw( &gDisplay );
-        gTft->DrawCanvas( &gDisplay );
+        // Screens::Splash splash;
+        // splash.Draw( &gDisplay );
+        // gTft->DrawCanvas( &gDisplay );
+        gTft->DrawBMPDDirect( "/OldSols.bmp" );
     }
 
     Bluetooth::Begin( BluetoothDeviceName );
@@ -187,6 +197,21 @@ void HandleStatusUpdate( const CarIO::CarStatus& car_status )
 
 void loop()
 {
+    static uint32_t last_memory_update = millis();
+    if( millis() - last_memory_update > 5000 )
+    {
+        last_memory_update = millis();
+        LOG_TRACE( "free memory: %d", ESP.getFreeHeap() );
+    }
+    {
+        auto motion_state = Motion::GetState();
+        if( motion_state.mValid )
+        {
+            auto now = millis();
+            BrakeHistoryTracker.PushData( motion_state.mForward, now );
+            LateralHistoryTracker.PushData( motion_state.mLeft, now );
+        }
+    }
     uint32_t fw_bytes = 0;
     if( BleOta::IsInProgress( &fw_bytes ) )
     {
@@ -228,6 +253,10 @@ void loop()
             gCurrentScreen = CurrentScreen::Navigation;
         }
         else if( gCurrentScreen == CurrentScreen::Navigation )
+        {
+            gCurrentScreen = CurrentScreen::GMeter;
+        }
+        else if( gCurrentScreen == CurrentScreen::GMeter )
         {
             gCurrentScreen = CurrentScreen::Default;
         }
@@ -310,6 +339,35 @@ void loop()
         navigation.mHasNotification = AppleNotifications::GetLatestNavigationNotification( navigation.mNotification );
         navigation.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
+    }
+    else if( gCurrentScreen == CurrentScreen::GMeter )
+    {
+        if( button_events.mMinuteButtonPressed )
+        {
+            Motion::Calibrate();
+        }
+
+        auto motion = Motion::GetState();
+        if( !motion.mCalibrated )
+        {
+            Screens::CalibrationMissing calibration_missing;
+            calibration_missing.Draw( &gDisplay );
+            gTft->DrawCanvas( &gDisplay );
+        }
+        else
+        {
+            Screens::GMeter g_meter;
+            if( motion.mValid )
+            {
+                g_meter.mBrakeLive = motion.mForward;
+                g_meter.mLateralLive = motion.mLeft;
+
+                BrakeHistoryTracker.GetData( g_meter.mBrakeHistory, Screens::GMeter::HistorySize );
+                LateralHistoryTracker.GetData( g_meter.mLateralHistory, Screens::GMeter::HistorySize );
+            }
+            g_meter.Draw( &gDisplay );
+            gTft->DrawCanvas( &gDisplay );
+        }
     }
     delay( 10 );
 }

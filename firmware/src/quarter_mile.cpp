@@ -45,6 +45,20 @@ namespace QuarterMile
         // we'll probably draw the screen from here.
         if( mState == QuarterMileState::Start )
         {
+            auto motion = Motion::GetState();
+            if( !motion.mCalibrated )
+            {
+                if( button_events.mMinuteButtonPressed )
+                {
+                    Motion::Calibrate();
+                }
+
+                Screens::CalibrationMissing calibration_missing;
+                calibration_missing.Draw( display );
+                tft->DrawCanvas( display );
+                return;
+            }
+
             Screens::QuarterMile::Start start;
             start.Draw( display );
             tft->DrawCanvas( display );
@@ -56,14 +70,17 @@ namespace QuarterMile
         }
         else if( mState == QuarterMileState::Launch )
         {
+            auto motion = Motion::GetState();
             Screens::QuarterMile::Launch launch;
+            launch.mAccelerationG = motion.mForward;
             launch.Draw( display );
             tft->DrawCanvas( display );
             // wait for some g threshold to detect launch.
             // note, we need forward direction specifically!
             // for now, just press the minute button to simulate launch.
 
-            if( button_events.mMinuteButtonPressed )
+
+            if( motion.mForward >= 0.2 || button_events.mMinuteButtonPressed )
             {
                 mState = QuarterMileState::InProgress;
                 mStartTimeMs = millis();
