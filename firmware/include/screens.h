@@ -7,6 +7,7 @@
 
 namespace Screens
 {
+    void PreloadImages();
     class Screen
     {
       public:
@@ -82,6 +83,26 @@ namespace Screens
       public:
         bool mHasNotification;
         AppleNotifications::DisplayNotification mNotification;
+        void Draw( Display::Display* display ) override;
+    };
+
+    class CalibrationMissing : public Screen
+    {
+      public:
+        void Draw( Display::Display* display ) override;
+    };
+
+    class GMeter : public Screen
+    {
+      public:
+        constexpr static size_t HistorySize = 103;
+
+        double mBrakeLive;
+        double mLateralLive;
+
+        double mBrakeHistory[ HistorySize ];
+        double mLateralHistory[ HistorySize ];
+
         void Draw( Display::Display* display ) override;
     };
 

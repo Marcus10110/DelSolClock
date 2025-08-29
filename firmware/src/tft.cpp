@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include "pins.h"
 #include <Adafruit_GFX.h>
+#include <SPIFFS_ImageReader.h>
 #include "SPIFFS.h"
 #include "logger.h"
 namespace Tft
@@ -49,5 +50,13 @@ namespace Tft
     void Tft::DrawCanvas( GFXcanvas16* canvas )
     {
         mTft.drawRGBBitmap( 0, 0, canvas->getBuffer(), canvas->width(), canvas->height() );
+    }
+
+    void Tft::DrawBMPDDirect( char* filename, int16_t x, int16_t y )
+    {
+        auto start_time = millis();
+        SPIFFS_ImageReader reader;
+        reader.drawBMP( filename, mTft, x, y );
+        LOG_TRACE( "DrawBMPDDirect took %d ms", millis() - start_time );
     }
 }

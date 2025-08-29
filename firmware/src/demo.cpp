@@ -3,6 +3,7 @@
 #include "tft.h"
 #include "display.h"
 #include "logger.h"
+#include "motion.h"
 
 namespace Demo
 {
@@ -10,15 +11,33 @@ namespace Demo
     {
         void DrawScreen( Screens::Screen& screen, Display::Display* display, Tft::Tft* tft, int ms = 3000 )
         {
-            LOG_TRACE( "DrawScreen" );
+            // LOG_TRACE( "DrawScreen" );
             screen.Draw( display );
             tft->DrawCanvas( display );
-            delay( ms );
+            delay( 10 );
+            // print memory usage:
+            LOG_TRACE( "free memory: %d", ESP.getFreeHeap() );
         }
+
+        Motion::HistoryTracker brakeHistoryTracker( Screens::GMeter::HistorySize, 100 );
+        Motion::HistoryTracker lateralHistoryTracker( Screens::GMeter::HistorySize, 100 );
     }
 
     void Demo( Display::Display* display, Tft::Tft* tft )
     {
+        {
+            Screens::GMeter gmeter;
+            gmeter.mBrakeLive = random( -60, 60 ) / 100.0;
+            gmeter.mLateralLive = random( -60, 60 ) / 100.0;
+
+            brakeHistoryTracker.PushData( gmeter.mBrakeLive, millis() );
+            lateralHistoryTracker.PushData( gmeter.mLateralLive, millis() );
+
+            brakeHistoryTracker.GetData( gmeter.mBrakeHistory, Screens::GMeter::HistorySize );
+            lateralHistoryTracker.GetData( gmeter.mLateralHistory, Screens::GMeter::HistorySize );
+            DrawScreen( gmeter, display, tft );
+            return;
+        }
         {
             Screens::Navigation left;
             left.mHasNotification = true;
@@ -68,8 +87,9 @@ namespace Demo
         }
 
         {
-            Screens::Splash splash;
-            DrawScreen( splash, display, tft );
+            // Screens::Splash splash;
+            // DrawScreen( splash, display, tft );
+            tft->DrawBMPDDirect( "/OldSols.bmp" );
         }
 
         {
