@@ -148,6 +148,7 @@ namespace AppleNotifications
             Notification mNotification;
             bool mDetailRequested{ false };
             uint32_t mReceivedTime{ 0 };
+            uint32_t mDeleteAfterTime{ 0 };
             String mAppIdentifier;
             String mTitle;
             String mSubtitle;
@@ -302,7 +303,8 @@ namespace AppleNotifications
                 }
                 else if( notification.mEventId == Notification::EventId::NotificationRemoved )
                 {
-                    OpenNotifications.erase( notification.mNotificationUID );
+                    // tag for removal later (in ~5 seconds)
+                    OpenNotifications[ notification.mNotificationUID ].mDeleteAfterTime = millis() + 5000;
                 }
                 else if( notification.mEventId == Notification::EventId::NotificationModified )
                 {
@@ -397,6 +399,12 @@ namespace AppleNotifications
         // go through all notifications and request details where needed.
         for( auto& notification : OpenNotifications )
         {
+            if( notification.second.mDeleteAfterTime != 0 && now >= notification.second.mDeleteAfterTime )
+            {
+                LOG_INFO( "Deleting notification %lu after delay", notification.first );
+                OpenNotifications.erase( notification.first );
+                return; // map iterator invalidated, so return and start over next time.
+            }
             if( notification.second.mDetailRequested )
             {
                 continue;
@@ -435,6 +443,20 @@ namespace AppleNotifications
         return true;
     }
 
+    bool IsNavigationNotification( const NotificationSummary& notification )
+    {
+        // hide "Traffic data received." messages
+        if( notification.mAppIdentifier != "com.google.Maps" && notification.mAppIdentifier != "com.apple.Maps" )
+        {
+            return false;
+        }
+        if( notification.mMessage == "Traffic data received." )
+        {
+            return false;
+        }
+        return true;
+    }
+
     bool GetLatestNavigationNotification( DisplayNotification& notification )
     {
         std::scoped_lock lock( mMutex );
@@ -446,13 +468,15 @@ namespace AppleNotifications
         std::optional<uint32_t> most_recent_nav_notification_uid;
         for( auto& n : OpenNotifications )
         {
-            if( n.second.mAppIdentifier == "com.google.Maps" || n.second.mAppIdentifier == "com.apple.Maps" )
+            if( !IsNavigationNotification( n.second ) )
             {
-                if( !most_recent_nav_notification_uid.has_value() ||
-                    n.second.mReceivedTime > OpenNotifications[ most_recent_nav_notification_uid.value() ].mReceivedTime )
-                {
-                    most_recent_nav_notification_uid = n.first;
-                }
+                continue;
+            }
+
+            if( !most_recent_nav_notification_uid.has_value() ||
+                n.second.mReceivedTime > OpenNotifications[ most_recent_nav_notification_uid.value() ].mReceivedTime )
+            {
+                most_recent_nav_notification_uid = n.first;
             }
         }
         if( !most_recent_nav_notification_uid.has_value() )
