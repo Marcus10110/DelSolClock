@@ -19,7 +19,9 @@
 #include "ble_ota.h"
 #include "logger.h"
 
-#define APPLE_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
+#define APPLE_MUSIC_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
+
+#define ANCS_SERVICE_UUID "7905F431-B5CE-4E99-A40F-4B1E122D00D0"
 
 #define DELSOL_VEHICLE_SERVICE_UUID "8fb88487-73cf-4cce-b495-505a4b54b802"
 #define DELSOL_STATUS_CHARACTERISTIC_UUID "40d527f5-3204-44a2-a4ee-d8d3c16f970e"
@@ -46,6 +48,27 @@ namespace Bluetooth
 
         RTC_DATA_ATTR bool TimeSet = false;
 
+        void PrintBondList()
+        {
+            int dev_num = esp_ble_get_bond_device_num();
+            LOG_TRACE( "devices bonded: %i", dev_num );
+            if( dev_num <= 0 )
+            {
+                return;
+            }
+
+            esp_ble_bond_dev_t* dev_list = ( esp_ble_bond_dev_t* )malloc( sizeof( esp_ble_bond_dev_t ) * dev_num );
+            esp_ble_get_bond_device_list( &dev_num, dev_list );
+
+            for( int i = 0; i < dev_num; i++ )
+            {
+                const auto& addr = dev_list[ i ].bd_addr;
+                LOG_TRACE( "  %d: %02x %02x %02x %02x %02x %02x", i, addr[ 0 ], addr[ 1 ], addr[ 2 ], addr[ 3 ], addr[ 4 ], addr[ 5 ] );
+            }
+
+            free( dev_list );
+        }
+
         class GetAddressServerCallbacks : public BLEServerCallbacks
         {
           public:
@@ -60,12 +83,14 @@ namespace Bluetooth
                 IPhoneAddress = new BLEAddress( param->connect.remote_bda );
 
                 DeviceConnected = true;
+                PrintBondList();
             };
 
             void onDisconnect( BLEServer* server ) override
             {
                 LOG_TRACE( "onDisconnect CB" );
                 DeviceConnected = false;
+                PrintBondList();
             }
         };
 
@@ -108,6 +133,7 @@ namespace Bluetooth
                     LOG_ERROR( "Authentication failed. reason: %u, auth_mode: %u, key_present: %u, key_type: %u", cmpl.fail_reason,
                                cmpl.auth_mode, cmpl.key_present, cmpl.key_type );
                 }
+                PrintBondList();
             }
         };
 
@@ -187,45 +213,48 @@ namespace Bluetooth
 
             if( !AppleMediaService::StartMediaService( Client ) )
             {
-                Client->disconnect();
-                delete Client;
-                Client = nullptr;
+                // we support continuing without these services, because windows does not provide them.
                 LOG_ERROR( "StartMediaService failed" );
-                return;
             }
 
             CurrentTimeService::CurrentTime time;
             if( !CurrentTimeService::StartTimeService( Client, &time ) )
             {
                 LOG_ERROR( "StartTimeService failed" );
-                return;
-            }
-            timeval new_time;
-            new_time.tv_sec = time.ToTimeT();
-            new_time.tv_usec = static_cast<long>( time.mSecondsFraction * 1000000 );
-            LOG_INFO( "Unix time stamp: %l, usec: %l", new_time.tv_sec, new_time.tv_usec );
-
-            if( settimeofday( &new_time, nullptr ) != 0 )
-            {
-                LOG_ERROR( "Error setting time of day" );
             }
             else
             {
-                TimeSet = true;
+                timeval new_time;
+                new_time.tv_sec = time.ToTimeT();
+                new_time.tv_usec = static_cast<long>( time.mSecondsFraction * 1000000 );
+                LOG_INFO( "Unix time stamp: %l, usec: %l", new_time.tv_sec, new_time.tv_usec );
+
+                if( settimeofday( &new_time, nullptr ) != 0 )
+                {
+                    LOG_ERROR( "Error setting time of day" );
+                }
+                else
+                {
+                    TimeSet = true;
+                }
+
+                time.Dump();
             }
 
-            time.Dump();
 // Apple Notification Service disabled, not used.
 #if 1
             if( !AppleNotifications::StartNotificationService( Client ) )
             {
                 LOG_ERROR( "failed to start the notification service" );
-                return;
+                // return;
             }
-            LOG_TRACE( "Notification service started" );
+            else
+            {
+                LOG_TRACE( "Notification service started" );
+            }
+
 #endif
         }
-
 
     }
 
@@ -233,8 +262,10 @@ namespace Bluetooth
     void Begin( const std::string& device_name )
     {
         LOG_TRACE( "Bluetooth::Begin()" );
+
         Ended = false;
         BLEDevice::init( device_name );
+        PrintBondList();
         Server = BLEDevice::createServer();
         Server->setCallbacks( new GetAddressServerCallbacks() );
 
@@ -276,27 +307,25 @@ namespace Bluetooth
         BLEDevice::setEncryptionLevel( ESP_BLE_SEC_ENCRYPT );
         BLEDevice::setSecurityCallbacks( new NotificationSecurityCallbacks() );
 
-
-        BLEAdvertising* advertising = Server->getAdvertising();
-        advertising->setAppearance( 0x03C1 );
-        advertising->setScanResponse( true );
-
+        // advertising data is what devices can see without initiating contact with our device.
         BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
+        oAdvertisementData.setFlags( 0x06 ); // was 0x01
+        oAdvertisementData.setName( device_name );
+        oAdvertisementData.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
+        // no service solicitation in the advertisement data, because it doesn't do anything useful
+
+        // scan response data includes the complete list of our capabilities and solicitations.
         BLEAdvertisementData scan_response_data;
         scan_response_data.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
-        oAdvertisementData.setFlags( 0x01 );
-        // advertise the vehicle service.
-        // oAdvertisementData.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
-        // Apple Media Service
-        setServiceSolicitation( oAdvertisementData, BLEUUID( APPLE_SERVICE_UUID ) );
-        // Apple Notification Service ANCS
-        // setServiceSolicitation( oAdvertisementData, BLEUUID( "7905F431-B5CE-4E99-A40F-4B1E122D00D0" ) );
-        auto before = oAdvertisementData.getPayload().size();
-        oAdvertisementData.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
-        auto after = oAdvertisementData.getPayload().size();
-        LOG_TRACE( "advertising size before %i, after %i", before, after );
+        setServiceSolicitation( scan_response_data, BLEUUID( APPLE_MUSIC_SERVICE_UUID ) );
+        setServiceSolicitation( scan_response_data, BLEUUID( ANCS_SERVICE_UUID ) );
+
+        BLEAdvertising* advertising = Server->getAdvertising();
+        advertising->setAppearance( 0x0100 );
+        advertising->setScanResponse( true );
         advertising->setAdvertisementData( oAdvertisementData );
         advertising->setScanResponseData( scan_response_data );
+        advertising->setAdvertisementType( ADV_TYPE_IND );
 
         // TODO: Figure out what this does, and why we set it twice.
         Security.setAuthenticationMode( ESP_LE_AUTH_REQ_SC_BOND );
