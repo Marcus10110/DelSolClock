@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <mutex>
 
 #include "esp_ota_ops.h"
 
@@ -18,8 +19,18 @@ namespace BleOta
     namespace
     {
         esp_ota_handle_t UpdateHandle = 0;
-        uint32_t BytesReceived{ 0 };
+
+        uint32_t PacketsReceived{ 0 };
+        uint32_t FirstPacketTimeMs{ 0 };
+        uint32_t LastPacketTimeMs{ 0 };
+
         constexpr uint32_t FullOtaPacketSize = 512;
+
+        // cross thread data
+        std::mutex Mutex;
+        uint32_t BytesReceived{ 0 };
+        bool RebootRequired{ false };
+        uint32_t RebootMinTimeMs{ 0 };
         class OtaWriteCallbacks : public BLECharacteristicCallbacks
         {
           public:
@@ -28,52 +39,84 @@ namespace BleOta
                 auto start_time = millis();
                 esp_err_t status;
                 std::string rxData = characteristic->getValue();
-                if( BytesReceived == 0 )
+
+                uint32_t bytes_received = 0;
                 {
-                    LOG_TRACE( "BeginOTA" );
+                    std::scoped_lock lock( Mutex );
+                    if( BytesReceived == 0 )
+                    {
+                        LOG_TRACE( "BeginOTA" );
+                        FirstPacketTimeMs = millis();
+                    }
+                    BytesReceived += rxData.length();
+                    bytes_received = BytesReceived;
                 }
+
 
                 if( rxData.length() > 0 )
                 {
                     status = esp_ota_write( UpdateHandle, rxData.c_str(), rxData.length() );
-                    LOG_TRACE( "esp_ota_write: %i", status );
-                    BytesReceived += rxData.length();
-                    LOG_TRACE( "OTA received %u bytes", BytesReceived );
+                    if( status != ESP_OK )
+                    {
+                        LOG_ERROR( "esp_ota_write: %i", status );
+                        // TODO handle error;
+                    }
                 }
                 auto write_time = millis() - start_time;
-                if( rxData.length() != FullOtaPacketSize && BytesReceived > 0 )
+                if( rxData.length() != FullOtaPacketSize && bytes_received > 0 )
                 {
                     LOG_TRACE( "EndOTA" );
                     status = esp_ota_end( UpdateHandle );
-                    LOG_TRACE( "esp_ota_end: %i", status );
+                    if( status != ESP_OK )
+                    {
+                        LOG_ERROR( "esp_ota_end error: %i", status );
+                        // TODO handle error;
+                    }
                     status = esp_ota_set_boot_partition( esp_ota_get_next_update_partition( NULL ) );
                     LOG_TRACE( "esp_ota_set_boot_partition: %i", status );
                     if( status == ESP_OK )
                     {
+                        // the PC never gets this. I think we need to return from this callback before we reboot the device.
                         characteristic->setValue( "success" );
                         characteristic->notify();
                         LOG_TRACE( "notified success" );
-                        delay( 2000 );
-                        esp_restart();
+
+                        {
+                            std::scoped_lock lock( Mutex );
+                            RebootMinTimeMs = millis() + 3000;
+                            RebootRequired = true;
+                        }
                         return;
                     }
                     else
                     {
-                        BytesReceived = 0;
+                        {
+                            std::scoped_lock lock( Mutex );
+                            BytesReceived = 0;
+                        }
                         LOG_ERROR( "Upload Error" );
                         characteristic->setValue( "error" );
-                        LOG_TRACE( "notified error" );
                         characteristic->notify();
+                        LOG_TRACE( "notified error" );
                         return;
                     }
                 }
 
-
                 characteristic->setValue( "continue" );
-                LOG_TRACE( "notified continue" );
                 characteristic->notify();
-                auto total_time = millis() - start_time;
-                LOG_TRACE( "OTA fw write %i, total %i", write_time, total_time );
+
+                uint32_t packet_time = 0;
+                if( LastPacketTimeMs > 0 )
+                {
+                    packet_time = millis() - LastPacketTimeMs;
+                }
+                LastPacketTimeMs = millis();
+
+                auto cycle_time = millis() - start_time;
+                auto total_time = millis() - FirstPacketTimeMs;
+                PacketsReceived++;
+                float ms_per_cycle = static_cast<float>( total_time ) / PacketsReceived;
+                LOG_TRACE( "OTA %ims/%ims/%ims %1.1f %u B", cycle_time, packet_time, total_time, ms_per_cycle, bytes_received );
             }
         };
     }
@@ -100,10 +143,21 @@ namespace BleOta
 
     bool IsInProgress( uint32_t* bytes_received )
     {
+        std::scoped_lock lock( Mutex );
         if( bytes_received != nullptr )
         {
             *bytes_received = BytesReceived;
         }
         return BytesReceived > 0;
+    }
+
+    bool IsRebootRequired()
+    {
+        std::scoped_lock lock( Mutex );
+        if( RebootRequired && millis() >= RebootMinTimeMs )
+        {
+            return true;
+        }
+        return false;
     }
 }

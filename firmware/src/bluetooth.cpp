@@ -211,6 +211,15 @@ namespace Bluetooth
                 return;
             }
 
+            // note, this had no effect on short range FW update rate.
+            // it may have made a difference at longer range FW updates, but unclear.
+            // attempt to change interval;
+            // LOG_TRACE( "updateConnParams" );
+            // esp_bd_addr_t peer_address;
+            // memcpy( peer_address, Client->getPeerAddress().getNative(), sizeof( esp_bd_addr_t ) );
+            // Server->updateConnParams( peer_address, 6, 12, 0, 400 );
+
+
             if( !AppleMediaService::StartMediaService( Client ) )
             {
                 // we support continuing without these services, because windows does not provide them.
@@ -326,6 +335,8 @@ namespace Bluetooth
         advertising->setAdvertisementData( oAdvertisementData );
         advertising->setScanResponseData( scan_response_data );
         advertising->setAdvertisementType( ADV_TYPE_IND );
+        // advertising->setMinPreferred( 0x06 ); // 7.5ms
+        // advertising->setMaxPreferred( 0x0C ); // 15ms
 
         // TODO: Figure out what this does, and why we set it twice.
         Security.setAuthenticationMode( ESP_LE_AUTH_REQ_SC_BOND );

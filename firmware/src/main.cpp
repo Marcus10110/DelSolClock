@@ -44,6 +44,7 @@ enum class CurrentScreen
 namespace
 {
     bool FwUpdateInProgress = false;
+    uint32_t FwBytesReceived = 0;
     bool LightsAlarmActive = false;
     std::string StatusCharacteristicValue = "";
     const std::string BluetoothDeviceName = "Del Sol";
@@ -220,6 +221,21 @@ void loop()
             FwUpdateInProgress = true;
             // update the display
             LOG_TRACE( "FW Update started. Disabling normal functions." );
+        }
+
+        if( BleOta::IsRebootRequired() )
+        {
+            esp_restart();
+            return;
+        }
+
+        if( fw_bytes >= FwBytesReceived )
+        {
+            FwBytesReceived = fw_bytes;
+            Screens::OtaInProgress ota_screen;
+            ota_screen.mBytesReceived = fw_bytes;
+            ota_screen.Draw( &gDisplay );
+            gTft->DrawCanvas( &gDisplay );
         }
         return; // don't do anything else while we're updating.
     }
