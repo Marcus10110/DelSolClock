@@ -138,11 +138,11 @@ public partial class StatusPage : ContentPage, INotifyPropertyChanged
             CancelScanButton.IsVisible = true;
             HelpCard.IsVisible = false;
 
-            // Scan for devices
-            var devices = await _delSolDevice.ScanForDevicesAsync( TimeSpan.FromSeconds( 5 ) );
+            // Scan for devices 
+            var devices = await _delSolDevice.ScanForDevicesAsync( TimeSpan.FromSeconds( 3 ) );
 
-            // Add devices to list (sort compatible devices to top)
-            var sortedDevices = devices.OrderByDescending( d => d.HasCorrectService ).ThenBy( d => d.Name );
+            // Add devices to list
+            var sortedDevices = devices.OrderBy( d => d.Name );
             foreach( var device in sortedDevices )
             {
                 DiscoveredDevices.Add( device );
@@ -201,8 +201,8 @@ public partial class StatusPage : ContentPage, INotifyPropertyChanged
             // Get known devices
             var knownDevices = await _delSolDevice.GetKnownDevicesAsync();
 
-            // Add devices to list (sort compatible devices to top)
-            var sortedKnownDevices = knownDevices.OrderByDescending( d => d.HasCorrectService ).ThenBy( d => d.Name );
+            // Add devices to list
+            var sortedKnownDevices = knownDevices.OrderBy( d => d.Name );
             foreach( var device in sortedKnownDevices )
             {
                 DiscoveredDevices.Add( device );

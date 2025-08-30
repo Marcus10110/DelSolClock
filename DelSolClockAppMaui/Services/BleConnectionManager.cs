@@ -10,6 +10,7 @@ using Plugin.BLE.Abstractions.EventArgs;
 using Plugin.BLE.Abstractions;
 using DelSolClockAppMaui.Models;
 using DelSolClockAppMaui.Models.EventArgs;
+using Windows.UI.WebUI;
 
 namespace DelSolClockAppMaui.Services;
 
@@ -85,39 +86,43 @@ public class BleConnectionManager : IDisposable
         }
 
         var discoveredDevices = new List<DiscoveredDevice>();
+        var deviceAdvertisedHandler = new EventHandler<DeviceEventArgs>( ( sender, args ) =>
+        {
+            var device = args.Device;
+            if( device?.Name != null && !string.IsNullOrWhiteSpace( device.Name ) )
+            {
+                var discoveredDevice = new DiscoveredDevice
+                {
+                    Name = device.Name,
+                    Id = device.Id.ToString(),
+                    DeviceId = device.Id,
+                    IsKnownDevice = false,
+                    SignalStrength = args.Device.Rssi,
+                    LastSeen = DateTime.Now,
+                    BleDevice = device
+                };
+
+                // Avoid duplicates
+                if( !discoveredDevices.Any( d => d.Id == discoveredDevice.Id ) )
+                {
+                    discoveredDevices.Add( discoveredDevice );
+                    _logger.LogInformation( "Discovered device: {Name} ({Id})", device.Name, device.Id );
+                }
+            }
+        } );
 
         try
         {
             _logger.LogInformation( "Starting BLE scan for service {ServiceId} with timeout {Timeout}", serviceId, timeout );
 
-            _adapter.DeviceAdvertised += ( sender, args ) =>
-            {
-                var device = args.Device;
-                if( device?.Name != null && !string.IsNullOrWhiteSpace( device.Name ) )
-                {
-                    var discoveredDevice = new DiscoveredDevice
-                    {
-                        Name = device.Name,
-                        Id = device.Id.ToString(),
-                        DeviceId = device.Id,
-                        IsKnownDevice = false,
-                        HasCorrectService = false, // TODO: Check advertised services when available in Plugin.BLE
-                        SignalStrength = args.Device.Rssi,
-                        LastSeen = DateTime.Now,
-                        BleDevice = device
-                    };
+            _adapter.DeviceAdvertised += deviceAdvertisedHandler;
 
-                    // Avoid duplicates
-                    if( !discoveredDevices.Any( d => d.Id == discoveredDevice.Id ) )
-                    {
-                        discoveredDevices.Add( discoveredDevice );
-                        _logger.LogInformation( "Discovered device: {Name} ({Id})", device.Name, device.Id );
-                    }
-                }
-            };
+            _adapter.ScanTimeout = (int)timeout.TotalMilliseconds;
+            await _adapter.StartScanningForDevicesAsync( new ScanFilterOptions { ServiceUuids = new Guid[] { serviceId } } );
 
-            await _adapter.StartScanningForDevicesAsync();
-            await Task.Delay( timeout );
+            _logger.LogInformation( "Start await finished." );
+
+
             await _adapter.StopScanningForDevicesAsync();
 
             _logger.LogInformation( "BLE scan completed. Found {Count} devices", discoveredDevices.Count );
@@ -126,9 +131,14 @@ public class BleConnectionManager : IDisposable
         {
             _logger.LogError( ex, "Error during BLE scan" );
         }
+        finally
+        {
+            _adapter.DeviceAdvertised -= deviceAdvertisedHandler;
+        }
 
         return discoveredDevices;
     }
+
 
     public async Task<List<DiscoveredDevice>> GetKnownDevicesAsync( Guid serviceId )
     {
@@ -155,7 +165,6 @@ public class BleConnectionManager : IDisposable
                         Id = device.Id.ToString(),
                         DeviceId = device.Id,
                         IsKnownDevice = true,
-                        HasCorrectService = true, // Known devices by definition have the correct service
                         SignalStrength = device.Rssi,
                         LastSeen = DateTime.Now,
                         BleDevice = device

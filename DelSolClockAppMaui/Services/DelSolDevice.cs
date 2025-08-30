@@ -78,7 +78,7 @@ public class DelSolDevice : IDisposable
         }
     }
 
-    public async Task<List<DiscoveredDevice>> ScanForDevicesAsync( TimeSpan timeout = default )
+    public async Task<List<DiscoveredDevice>> ScanForDevicesAsync( TimeSpan timeout = default)
     {
         if( _connectionManager == null || !_isInitialized )
         {

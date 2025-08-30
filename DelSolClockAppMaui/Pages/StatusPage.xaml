@@ -138,11 +138,6 @@
                                                    TextColor="Green"
                                                    FontAttributes="Bold"
                                                    IsVisible="{Binding IsKnownDevice}"/>
-                                            <Label Text="(Del Sol Compatible)" 
-                                                   FontSize="12" 
-                                                   TextColor="Blue"
-                                                   FontAttributes="Bold"
-                                                   IsVisible="{Binding HasCorrectService}"/>
                                         </StackLayout>
                                         <Label Text="{Binding SignalStrength, StringFormat='Signal: {0} dBm'}" 
                                                FontSize="12" 
