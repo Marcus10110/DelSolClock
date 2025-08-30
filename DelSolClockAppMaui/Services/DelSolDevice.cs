@@ -28,6 +28,7 @@ public class DelSolDevice : IDisposable
     public event EventHandler<VehicleStatusChangedEventArgs>? VehicleStatusChanged;
     public event EventHandler<BatteryStatusChangedEventArgs>? BatteryStatusChanged;
     public event EventHandler<FirmwareUpdateProgressEventArgs>? FirmwareUpdateProgress;
+    public event EventHandler<EventArgs>? FirmwareVersionChanged;
 
     public DelSolDevice( ILogger<DelSolDevice> logger )
     {
@@ -556,6 +557,9 @@ public class DelSolDevice : IDisposable
             {
                 FirmwareVersion = System.Text.Encoding.UTF8.GetString( versionResult.data );
                 _logger.LogInformation( "Read firmware version: {Version}", FirmwareVersion );
+                
+                // Fire firmware version changed event
+                FirmwareVersionChanged?.Invoke(this, EventArgs.Empty);
             }
         }
         catch( Exception ex )
@@ -602,7 +606,17 @@ public class DelSolDevice : IDisposable
         try
         {
             // Disconnect and clean up
-            DisconnectAsync().Wait( 5000 );
+            // Don't use .Wait() as it can cause deadlocks - let disposal happen naturally
+            _ = Task.Run(async () => {
+                try 
+                {
+                    await DisconnectAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error during async disconnect in disposal");
+                }
+            });
 
             // Dispose services
             _vehicleService?.Dispose();

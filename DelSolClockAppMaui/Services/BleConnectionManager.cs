@@ -101,6 +101,7 @@ public class BleConnectionManager : IDisposable
                         Id = device.Id.ToString(),
                         DeviceId = device.Id,
                         IsKnownDevice = false,
+                        HasCorrectService = false, // TODO: Check advertised services when available in Plugin.BLE
                         SignalStrength = args.Device.Rssi,
                         LastSeen = DateTime.Now,
                         BleDevice = device
@@ -154,6 +155,7 @@ public class BleConnectionManager : IDisposable
                         Id = device.Id.ToString(),
                         DeviceId = device.Id,
                         IsKnownDevice = true,
+                        HasCorrectService = true, // Known devices by definition have the correct service
                         SignalStrength = device.Rssi,
                         LastSeen = DateTime.Now,
                         BleDevice = device

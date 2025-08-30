@@ -63,7 +63,7 @@
                         <!-- Row 1 -->
                         <StackLayout Orientation="Horizontal" Grid.Row="0" Grid.Column="0">
                             <Label Text="🚗" FontSize="16"/>
-                            <Label x:Name="WindowStatusLabel" Text="Window: UP" FontSize="14"/>
+                            <Label x:Name="WindowStatusLabel" Text="Rear Window: --" FontSize="14"/>
                         </StackLayout>
                         <StackLayout Orientation="Horizontal" Grid.Row="0" Grid.Column="1">
                             <Label Text="🔋" FontSize="16"/>
@@ -73,21 +73,21 @@
                         <!-- Row 2 -->
                         <StackLayout Orientation="Horizontal" Grid.Row="1" Grid.Column="0">
                             <Label Text="📦" FontSize="16"/>
-                            <Label x:Name="TrunkStatusLabel" Text="Trunk: CLOSED" FontSize="14"/>
+                            <Label x:Name="TrunkStatusLabel" Text="Trunk: --" FontSize="14"/>
                         </StackLayout>
                         <StackLayout Orientation="Horizontal" Grid.Row="1" Grid.Column="1">
                             <Label Text="💡" FontSize="16"/>
-                            <Label x:Name="LightsStatusLabel" Text="Lights: OFF" FontSize="14"/>
+                            <Label x:Name="LightsStatusLabel" Text="Head Lights: --" FontSize="14"/>
                         </StackLayout>
                         
                         <!-- Row 3 -->
                         <StackLayout Orientation="Horizontal" Grid.Row="2" Grid.Column="0">
                             <Label Text="🏠" FontSize="16"/>
-                            <Label x:Name="RoofStatusLabel" Text="Roof: UP" FontSize="14"/>
+                            <Label x:Name="RoofStatusLabel" Text="Roof: --" FontSize="14"/>
                         </StackLayout>
                         <StackLayout Orientation="Horizontal" Grid.Row="2" Grid.Column="1">
                             <Label Text="🔥" FontSize="16"/>
-                            <Label x:Name="IgnitionStatusLabel" Text="Ignition: OFF" FontSize="14"/>
+                            <Label x:Name="IgnitionStatusLabel" Text="Ignition: --" FontSize="14"/>
                         </StackLayout>
                     </Grid>
                     
@@ -138,6 +138,11 @@
                                                    TextColor="Green"
                                                    FontAttributes="Bold"
                                                    IsVisible="{Binding IsKnownDevice}"/>
+                                            <Label Text="(Del Sol Compatible)" 
+                                                   FontSize="12" 
+                                                   TextColor="Blue"
+                                                   FontAttributes="Bold"
+                                                   IsVisible="{Binding HasCorrectService}"/>
                                         </StackLayout>
                                         <Label Text="{Binding SignalStrength, StringFormat='Signal: {0} dBm'}" 
                                                FontSize="12" 
