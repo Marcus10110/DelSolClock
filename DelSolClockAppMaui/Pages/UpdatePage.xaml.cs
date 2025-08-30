@@ -1,5 +1,6 @@
 using Microsoft.Maui.Controls;
 using DelSolClockAppMaui.Services;
+using DelSolClockAppMaui.Models.EventArgs;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 
@@ -7,13 +8,14 @@ namespace DelSolClockAppMaui.Pages;
 
 public partial class UpdatePage : ContentPage
 {
-    private DelSolConnection _ble = new();
+    private readonly DelSolDevice _delSolDevice;
     private bool _loaded = false;
 
     public ObservableCollection<UpdateItem> Items { get; set; } = new();
 
-    public UpdatePage()
+    public UpdatePage(DelSolDevice delSolDevice)
     {
+        _delSolDevice = delSolDevice;
         InitializeComponent();
         FirmwareCollection.ItemsSource = Items;
     }
@@ -26,6 +28,8 @@ public partial class UpdatePage : ContentPage
             _loaded = true;
             LoadReleases();
         }
+        // Subscribe to firmware update progress
+        _delSolDevice.FirmwareUpdateProgress += OnFirmwareUpdateProgress;
     }
 
     private async void LoadReleases()
@@ -84,8 +88,8 @@ public partial class UpdatePage : ContentPage
     {
         if( sender is Button button && button.CommandParameter is string url )
         {
-            // Check if device is connected (temporarily disabled until we integrate DelSolDevice)
-            if( !_ble.Connected )
+            // Check if device is connected
+            if( !_delSolDevice.IsConnected )
             {
                 await DisplayAlert( "Not Connected", "Please connect to a device first on the Status page", "OK" );
                 return;
@@ -96,14 +100,33 @@ public partial class UpdatePage : ContentPage
             UpdateProgressBar.Progress = 0;
             UpdateStatusLabel.Text = "Starting firmware update...";
             
+            // Disable refresh button during update
+            RefreshButton.IsEnabled = false;
+            
             try
             {
-                // TODO: Replace with DelSolDevice integration
-                _ble.StartFirmwareUpdate( url );
+                var success = await _delSolDevice.StartFirmwareUpdateAsync( url );
+                
+                if( !success )
+                {
+                    await DisplayAlert( "Update Failed", "Firmware update failed. Check the logs for details.", "OK" );
+                }
+                else
+                {
+                    await DisplayAlert( "Update Successful", "Firmware update completed successfully!", "OK" );
+                }
             }
             catch( Exception ex )
             {
                 await DisplayAlert( "Update Error", $"Failed to start firmware update: {ex.Message}", "OK" );
+            }
+            finally
+            {
+                // Re-enable refresh button
+                RefreshButton.IsEnabled = true;
+                
+                // Hide progress after a delay if update completed
+                await Task.Delay(3000);
                 UpdateProgressCard.IsVisible = false;
             }
         }
@@ -128,6 +151,33 @@ public partial class UpdatePage : ContentPage
     {
         _loaded = false;
         LoadReleases();
+    }
+
+    private void OnFirmwareUpdateProgress(object? sender, FirmwareUpdateProgressEventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            try
+            {
+                var progressValue = e.PercentComplete / 100.0;
+                Debug.WriteLine($"Firmware progress update: {e.PercentComplete}% - {e.Message}");
+                
+                UpdateProgressBar.Progress = progressValue;
+                UpdateStatusLabel.Text = e.Message;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error updating progress UI: {ex.Message}");
+            }
+        });
+    }
+    
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+
+        // Unsubscribe from events
+        _delSolDevice.FirmwareUpdateProgress -= OnFirmwareUpdateProgress;
     }
 
     public class UpdateItem
