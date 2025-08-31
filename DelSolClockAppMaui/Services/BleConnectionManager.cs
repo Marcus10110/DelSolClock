@@ -10,7 +10,6 @@ using Plugin.BLE.Abstractions.EventArgs;
 using Plugin.BLE.Abstractions;
 using DelSolClockAppMaui.Models;
 using DelSolClockAppMaui.Models.EventArgs;
-using Windows.UI.WebUI;
 
 namespace DelSolClockAppMaui.Services;
 
