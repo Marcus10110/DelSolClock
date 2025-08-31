@@ -11,6 +11,7 @@ namespace CarIO
         bool mIgnition;
         bool mLights;
         float mBatteryVoltage;
+        uint16_t mRawBatteryCode;
         float mIlluminationVoltage;
         bool mHourButton;
         bool mMinuteButton;

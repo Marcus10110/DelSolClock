@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include "car_io.h"
 
 namespace Bluetooth
 {
@@ -8,5 +9,5 @@ namespace Bluetooth
     void Service();
     bool IsConnected();
     bool IsTimeSet();
-    void SetVehicleStatus( const std::string& status );
+    void SetVehicleStatus( const CarIO::CarStatus& car_status );
 }

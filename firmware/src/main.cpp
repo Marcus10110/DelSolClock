@@ -40,7 +40,7 @@ enum class CurrentScreen
 
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
-// #define DISABLE_SLEEP
+#define DISABLE_SLEEP
 // define this to run the demo mode, which will cycle through all the screens.
 // #define DEMO_MODE
 namespace
@@ -48,7 +48,6 @@ namespace
     bool FwUpdateInProgress = false;
     uint32_t FwBytesReceived = 0;
     bool LightsAlarmActive = false;
-    std::string StatusCharacteristicValue = "";
     const std::string BluetoothDeviceName = "Del Sol";
 
     Tft::Tft* gTft;
@@ -105,6 +104,7 @@ void setup()
     while( 1 )
     {
         Demo::Demo( &gDisplay, gTft );
+        esp_task_wdt_reset();
     }
 #endif
 
@@ -117,6 +117,7 @@ void setup()
     {
         HandlePowerState( CarIO::GetStatus() );
         CarIO::Service();
+        esp_task_wdt_reset();
     }
     LOG_TRACE( "setup, GPS wake..." );
     Gps::Wake();
@@ -190,16 +191,7 @@ void Sleep()
 
 void HandleStatusUpdate( const CarIO::CarStatus& car_status )
 {
-    // StatusCharacteristicValue
-    char update[ 128 ] = { 0 };
-    snprintf( update, sizeof( update ), "%i,%i,%i,%i,%i", car_status.mRearWindow, car_status.mTrunk, car_status.mRoof, car_status.mIgnition,
-              car_status.mLights );
-    if( strcmp( update, StatusCharacteristicValue.c_str() ) != 0 )
-    {
-        StatusCharacteristicValue = update;
-        LOG_TRACE( "updating BLE characteristic with %s", StatusCharacteristicValue.c_str() );
-        Bluetooth::SetVehicleStatus( StatusCharacteristicValue );
-    }
+    Bluetooth::SetVehicleStatus( car_status );
 }
 
 

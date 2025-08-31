@@ -22,6 +22,27 @@ namespace CarIO
 
         std::optional<uint32_t> mMinuteDownMs{ std::nullopt };
         std::optional<uint32_t> mHourDownMs{ std::nullopt };
+
+
+        struct Poly4
+        {
+            float a;
+            float b;
+            float c;
+            float d;
+            float e;
+
+            float operator()( float x ) const
+            {
+                float x2 = x * x;
+                float x3 = x2 * x;
+                float x4 = x3 * x;
+                return ( a * x4 + b * x3 + c * x2 + d * x + e );
+            }
+        };
+
+        // From hardware/12V voltage vs BATT ADC code V2.xlsx: y = 4.8992E-13x4 - 1.9103E-09x3 + 2.5101E-06x2 + 2.3869E-03x + 6.0272E-01
+        constexpr Poly4 BatteryCalibrationCurve = { .a = 4.8992E-13, .b = -1.9103E-09, .c = 2.5101E-06, .d = 2.3869E-03, .e = 6.0272E-01 };
     }
     std::string CarStatus::ToString()
     {
@@ -58,18 +79,10 @@ namespace CarIO
         CarStatus status;
         uint16_t battery_code = analogRead( Pin::Battery );
         uint16_t illumination_code = analogRead( Pin::Illumination );
-        {
-            constexpr float a = 3.56743E-06;
-            constexpr float b = -0.007518604;
-            constexpr float c = 8.781351365;
-            float x = static_cast<float>( battery_code );
-            status.mBatteryVoltage = ( a * x * x ) + ( b * x ) + c;
-        }
+        status.mRawBatteryCode = battery_code;
+        status.mBatteryVoltage = BatteryCalibrationCurve( static_cast<float>( battery_code ) );
         pinMode( Pin::Illumination, INPUT ); // required to put the pin back into digital mode.
 
-        // Volts Per Code (Oct 2 2021) 0.0202547273
-        // status.mBatteryVoltage = battery_code * 0.0202547273f;
-        // volts per code (oct 2 2021) 0.003800545407
         status.mIlluminationVoltage = illumination_code * 0.003800545407f;
         status.mLights = digitalRead( Pin::Illumination );
         status.mIgnition = digitalRead( Pin::Ignition );

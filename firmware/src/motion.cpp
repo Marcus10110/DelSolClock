@@ -102,6 +102,7 @@ namespace Motion
         {
             while( !Sensor.begin_I2C() )
             {
+                // TODO: watchdog will go off here. do we want that?
                 LOG_ERROR( "failed to start I2C motion sensor" );
                 delay( 1000 );
             }

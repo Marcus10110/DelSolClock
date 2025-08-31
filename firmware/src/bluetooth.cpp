@@ -7,6 +7,7 @@
 #include <BLESecurity.h>
 #include <BLE2902.h>
 #include <BLE2904.h>
+#include <esp_task_wdt.h>
 
 #include <time.h>
 #include <sys/time.h>
@@ -16,6 +17,7 @@
 #include "apple_media_service.h"
 #include "current_time_service.h"
 #include "apple_notification_center_service.h"
+#include "debug_service.h"
 #include "ble_ota.h"
 #include "logger.h"
 
@@ -45,8 +47,12 @@ namespace Bluetooth
         BLEClient* Client = nullptr;
         BLESecurity Security{};
         BLECharacteristic* VehicleStatusCharacteristic = nullptr;
+        BLECharacteristic* BatteryCharacteristic = nullptr;
 
         RTC_DATA_ATTR bool TimeSet = false;
+
+        std::string StatusCharacteristicValue = "";
+        float LastBatteryVoltage = -1;
 
         void PrintBondList()
         {
@@ -200,6 +206,8 @@ namespace Bluetooth
             {
                 LOG_TRACE( "." );
                 delay( 100 );
+                // update WDT
+                esp_task_wdt_reset();
             }
             LOG_TRACE( "Authentication finished" );
             delay( 100 );
@@ -310,7 +318,16 @@ namespace Bluetooth
             BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY );
         VehicleStatusCharacteristic->addDescriptor( new BLE2902() );
         VehicleStatusCharacteristic->setValue( "" );
+        BatteryCharacteristic = vechicle_service->createCharacteristic(
+            DELSOL_BATTERY_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY );
+        BatteryCharacteristic->addDescriptor( new BLE2902() );
+        BatteryCharacteristic->setValue( LastBatteryVoltage );
         vechicle_service->start();
+
+        if( !DebugService::StartDebugService( Server ) )
+        {
+            LOG_ERROR( "failed to start the debug service" );
+        }
 
 
         BLEDevice::setEncryptionLevel( ESP_BLE_SEC_ENCRYPT );
@@ -418,13 +435,28 @@ namespace Bluetooth
         return TimeSet;
     }
 
-    void SetVehicleStatus( const std::string& status )
+    void SetVehicleStatus( const CarIO::CarStatus& car_status )
     {
-        if( VehicleStatusCharacteristic )
+        if( VehicleStatusCharacteristic && BatteryCharacteristic )
         {
-            VehicleStatusCharacteristic->setValue( status );
-            VehicleStatusCharacteristic->notify();
-            LOG_TRACE( "set characteristic notify." );
+            // StatusCharacteristicValue
+            char update[ 128 ] = { 0 };
+            snprintf( update, sizeof( update ), "%i,%i,%i,%i,%i", car_status.mRearWindow, car_status.mTrunk, car_status.mRoof,
+                      car_status.mIgnition, car_status.mLights );
+            if( strcmp( update, StatusCharacteristicValue.c_str() ) != 0 )
+            {
+                StatusCharacteristicValue = update;
+                LOG_TRACE( "updating BLE characteristic with %s", StatusCharacteristicValue.c_str() );
+                VehicleStatusCharacteristic->setValue( StatusCharacteristicValue );
+                VehicleStatusCharacteristic->notify();
+                LOG_TRACE( "set characteristic notify." );
+            }
+            if( abs( car_status.mBatteryVoltage - LastBatteryVoltage ) >= 0.1 )
+            {
+                LastBatteryVoltage = car_status.mBatteryVoltage;
+                BatteryCharacteristic->setValue( LastBatteryVoltage );
+                BatteryCharacteristic->notify();
+            }
         }
     }
 }
