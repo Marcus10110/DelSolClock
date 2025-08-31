@@ -23,6 +23,8 @@
 #include <time.h>
 #include <sys/time.h>
 
+#include <esp_task_wdt.h>
+
 #include "soc/rtc.h"
 
 
@@ -38,7 +40,7 @@ enum class CurrentScreen
 
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
-#define DISABLE_SLEEP
+// #define DISABLE_SLEEP
 // define this to run the demo mode, which will cycle through all the screens.
 // #define DEMO_MODE
 namespace
@@ -65,6 +67,10 @@ void setup()
 {
     Serial.begin( 115200 );
     LOG_TRACE( "Del Sol Clock Booting" );
+
+    Serial.println( "Configuring WDT..." );
+    esp_task_wdt_init( 20, true ); // initial 20 second timeout to totally handle init time, we reduce it later.
+    esp_task_wdt_add( NULL );
 
     LOG_TRACE( "free memory: %d", ESP.getFreeHeap() );
 
@@ -128,6 +134,7 @@ void setup()
         delay( 1000 );
         // TODO: should we keep this screen up until we get the first connection? Especially since we don't know the time yet?
     }
+    esp_task_wdt_init( 5, true );
 }
 
 void HandlePowerState( const CarIO::CarStatus& car_status )
@@ -198,6 +205,7 @@ void HandleStatusUpdate( const CarIO::CarStatus& car_status )
 
 void loop()
 {
+    esp_task_wdt_reset();
     static uint32_t last_memory_update = millis();
     if( millis() - last_memory_update > 5000 )
     {
