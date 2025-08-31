@@ -9,7 +9,7 @@
 // Apple Media Service Documentation:
 // https://developer.apple.com/library/archive/documentation/CoreBluetooth/Reference/AppleMediaService_Reference/Specification/Specification.html#//apple_ref/doc/uid/TP40014716-CH1-SW7
 
-#define APPLE_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
+#define APPLE_MUSIC_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
 #define APPLE_REMOTE_COMMAND_UUID "9B3C81D8-57B1-4A8A-B8DF-0E56F7CA51C2"
 #define APPLE_ENTITY_UPDATE_UUID "2F7CABCE-808D-411F-9A0C-BB92BA96C102"
 #define APPLE_ENTITY_ATTRIBUTE_UUID "C6B2F38C-23AB-46D8-A6AB-A3A870BBD5D7"
@@ -88,7 +88,7 @@ namespace AppleMediaService
             return false;
         }
 
-        auto music_service = client->getService( APPLE_SERVICE_UUID );
+        auto music_service = client->getService( APPLE_MUSIC_SERVICE_UUID );
         if( !music_service )
         {
             LOG_ERROR( "Apple music service not found" );

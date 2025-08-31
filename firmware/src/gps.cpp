@@ -11,8 +11,8 @@ namespace Gps
         constexpr uart_port_t GpsUartPort = UART_NUM_2;
         QueueHandle_t GpsUartQueue;
         TinyGPSPlus Gps;
-        constexpr char StandbyCommand[] = "$PMTK161,0*28\r\n";
-        constexpr char WakeCommand[] = "$PMTK010,002*2D\r\n";
+        // constexpr char StandbyCommand[] = "$PMTK161,0*28\r\n";
+        // constexpr char WakeCommand[] = "$PMTK010,002*2D\r\n";
     }
     TinyGPSPlus* GetGps()
     {
@@ -62,17 +62,19 @@ namespace Gps
         {
             float lat = Gps.location.lat();
             float lng = Gps.location.lng();
-            LOG_TRACE( "GPS: %f, %f", lat, lng );
+            // LOG_TRACE( "GPS: %f, %f", lat, lng );
         }
     }
     void Wake()
     {
-        auto bytes_pushed = uart_write_bytes( GpsUartPort, WakeCommand, sizeof( WakeCommand ) - 1 );
-        uart_wait_tx_done( GpsUartPort, 100 );
+        // I never managed to get low power mode working on the new SAM-M8Q.
+        // auto bytes_pushed = uart_write_bytes( GpsUartPort, WakeCommand, sizeof( WakeCommand ) - 1 );
+        // uart_wait_tx_done( GpsUartPort, 100 );
     }
     void Sleep()
     {
-        auto bytes_pushed = uart_write_bytes( GpsUartPort, StandbyCommand, sizeof( StandbyCommand ) - 1 );
-        uart_wait_tx_done( GpsUartPort, 100 );
+        // I never managed to get low power mode working on the new SAM-M8Q.
+        // auto bytes_pushed = uart_write_bytes( GpsUartPort, StandbyCommand, sizeof( StandbyCommand ) - 1 );
+        // uart_wait_tx_done( GpsUartPort, 100 );
     }
 }

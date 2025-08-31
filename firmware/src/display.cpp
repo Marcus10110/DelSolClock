@@ -10,49 +10,39 @@ namespace Display
         // cache the loaded images, because image load time is SLOW (5 sec for splash)
         std::map<std::string, SPIFFS_Image> mLoadedImages;
 
-        void DefaultImageLoader( GFXcanvas16* destination, char* path, int16_t x, int16_t y, bool delete_after_draw )
+
+        void DefaultImageLoader( GFXcanvas16* destination, char* path, int16_t x, int16_t y, bool delete_after_draw,
+                                 uint16_t monochrome_color )
         {
-            void* raw_canvas = nullptr;
-            if( mLoadedImages.count( path ) == 0 )
+            // LOG_TRACE( "loading/drawing image %s", path );
+            if( !PreloadImage( path ) )
             {
-                SPIFFS_ImageReader reader;
-                SPIFFS_Image& image = mLoadedImages[ path ];
-                auto load_result = reader.loadBMP( path, image );
-                if( load_result != IMAGE_SUCCESS )
-                {
-                    // failed to load image
-                    LOG_ERROR( "Failed to load image %s, code: %u", path, load_result );
-                    if( load_result == IMAGE_ERR_MALLOC )
-                    {
-                        LOG_INFO( "free memory: %d", ESP.getFreeHeap() );
-                    }
-                    return;
-                }
-                auto format = image.getFormat();
-                if( format != IMAGE_16 )
-                {
-                    LOG_ERROR( "Unsupported image format %u", format );
-                    return;
-                }
-                raw_canvas = image.getCanvas();
-                if( raw_canvas == nullptr )
-                {
-                    LOG_ERROR( "Failed to get canvas from image" );
-                    return;
-                }
+                LOG_ERROR( "Failed to preload image %s", path );
+                return;
+            }
+
+            auto& loaded_image = mLoadedImages.at( path );
+            void* raw_canvas = loaded_image.getCanvas();
+            if( raw_canvas == nullptr )
+            {
+                LOG_ERROR( "Failed to get canvas from cached image %s", path );
+                return;
+            }
+
+            if( loaded_image.getFormat() == IMAGE_16 )
+            {
+                GFXcanvas16* image_canvas = static_cast<GFXcanvas16*>( raw_canvas );
+                destination->drawRGBBitmap( x, y, image_canvas->getBuffer(), image_canvas->width(), image_canvas->height() );
+            }
+            else if( loaded_image.getFormat() == IMAGE_1 )
+            {
+                GFXcanvas1* image_canvas = static_cast<GFXcanvas1*>( raw_canvas );
+                destination->drawBitmap( x, y, image_canvas->getBuffer(), image_canvas->width(), image_canvas->height(), monochrome_color );
             }
             else
             {
-                raw_canvas = mLoadedImages.at( path ).getCanvas();
-                if( raw_canvas == nullptr )
-                {
-                    LOG_ERROR( "Failed to get canvas from cached image" );
-                    return;
-                }
+                LOG_ERROR( "Unsupported image format %u", loaded_image.getFormat() );
             }
-
-            GFXcanvas16* image_canvas = static_cast<GFXcanvas16*>( raw_canvas );
-            destination->drawRGBBitmap( x, y, image_canvas->getBuffer(), image_canvas->width(), image_canvas->height() );
 
             if( delete_after_draw )
             {
@@ -60,6 +50,46 @@ namespace Display
             }
         }
     }
+
+    bool PreloadImage( char* path )
+    {
+        if( mLoadedImages.count( path ) == 0 )
+        {
+            auto start_time = millis();
+            LOG_INFO( "%s not already loaded. loading now. \tFree Heap: %d", path, ESP.getFreeHeap() );
+            SPIFFS_ImageReader reader;
+            SPIFFS_Image& image = mLoadedImages[ path ];
+            auto load_result = reader.loadBMP( path, image );
+            if( load_result != IMAGE_SUCCESS )
+            {
+                // failed to load image
+                LOG_ERROR( "Failed to load image %s, code: %u", path, load_result );
+                if( load_result == IMAGE_ERR_MALLOC )
+                {
+                    LOG_INFO( "free memory: %d", ESP.getFreeHeap() );
+                }
+                // remove from the collection
+                mLoadedImages.erase( path );
+                return false;
+            }
+            auto format = image.getFormat();
+            if( format != IMAGE_16 && format != IMAGE_1 )
+            {
+                LOG_ERROR( "Unsupported image format %u", format );
+                // remove from the collection:
+                mLoadedImages.erase( path );
+                return false;
+            }
+
+            // print buffer size in bytes
+            auto duration = millis() - start_time;
+            auto size_bytes = format == IMAGE_16 ? image.width() * image.height() * 2 : ( ( image.width() + 7 ) / 8 * image.height() );
+            LOG_INFO( "Loaded image %s, \tbuffer size: %d bytes. \tFree heap: %d. \tDuration MS: %d", path, size_bytes, ESP.getFreeHeap(),
+                      duration );
+        }
+        return true;
+    }
+
     Display::Display( ImageLoaderFn image_loader )
         : GFXcanvas16( 240, 136 ), mImageLoader( image_loader ? image_loader : DefaultImageLoader )
     {
@@ -80,10 +110,10 @@ namespace Display
         setTextSize( DefaultFontSize );
     }
 
-    void Display::DrawBMP( char* path, int16_t x, int16_t y, bool delete_after_draw )
+    void Display::DrawBMP( char* path, int16_t x, int16_t y, bool delete_after_draw, uint16_t monochrome_color )
     {
         assert( mImageLoader != nullptr );
-        mImageLoader( this, path, x, y, delete_after_draw );
+        mImageLoader( this, path, x, y, delete_after_draw, monochrome_color );
     }
 
     // get text position based on some settings. Uses current font settings, etc.

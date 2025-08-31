@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DelSolClockAppMaui.Pages.UpdatePage"
+             Title="Firmware Updates">
+             
+    <ScrollView>
+        <StackLayout Padding="16" Spacing="16">
+            <!-- Header Card -->
+            <Frame BackgroundColor="LightBlue" CornerRadius="12" Padding="16">
+                <StackLayout Spacing="8">
+                    <Label Text="Firmware Updates" 
+                           FontSize="20" 
+                           FontAttributes="Bold" 
+                           TextColor="Black"/>
+                    <Label Text="Select a firmware version to update your Del Sol Clock device" 
+                           FontSize="14" 
+                           TextColor="DarkBlue"/>
+                    <Button x:Name="RefreshButton"
+                            Text="Refresh Releases"
+                            BackgroundColor="DarkBlue"
+                            TextColor="White"
+                            CornerRadius="8"
+                            Clicked="OnRefreshClicked"/>
+                </StackLayout>
+            </Frame>
+            
+            <!-- Loading Indicator -->
+            <StackLayout x:Name="LoadingCard" IsVisible="False">
+                <Frame BackgroundColor="LightGray" CornerRadius="12" Padding="16">
+                    <StackLayout Spacing="12" HorizontalOptions="Center">
+                        <ActivityIndicator x:Name="LoadingSpinner" 
+                                         IsRunning="False" 
+                                         Color="Blue"/>
+                        <Label x:Name="LoadingLabel" 
+                               Text="Loading firmware releases..." 
+                               HorizontalOptions="Center"
+                               FontSize="14"/>
+                    </StackLayout>
+                </Frame>
+            </StackLayout>
+            
+            <!-- Firmware Releases -->
+            <CollectionView x:Name="FirmwareCollection" SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Frame Margin="0,0,0,12" 
+                               BackgroundColor="White" 
+                               CornerRadius="12" 
+                               HasShadow="True"
+                               Padding="0">
+                            <StackLayout Spacing="0">
+                                <!-- Header -->
+                                <StackLayout Padding="16,12" 
+                                           BackgroundColor="#f8f9fa">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Label Grid.Column="0"
+                                               Text="{Binding Name}" 
+                                               FontSize="18" 
+                                               FontAttributes="Bold"
+                                               TextColor="#2c3e50"/>
+                                        <Label Grid.Column="1"
+                                               Text="{Binding PublishedAt, StringFormat='{0:MMM dd, yyyy}'}" 
+                                               FontSize="12" 
+                                               TextColor="#6c757d"
+                                               VerticalOptions="Center"/>
+                                    </Grid>
+                                </StackLayout>
+                                
+                                <!-- Content -->
+                                <StackLayout Padding="16" Spacing="12">
+                                    <Label Text="Release Notes:" 
+                                           FontSize="14" 
+                                           FontAttributes="Bold"
+                                           TextColor="DarkSlateGray"/>
+                                    <Label Text="{Binding Body}" 
+                                           FontSize="14" 
+                                           TextColor="Black"
+                                           MaxLines="6"/>
+                                    
+                                    <!-- Action Buttons -->
+                                    <Grid ColumnSpacing="12" Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0"
+                                                Text="Install Update"
+                                                BackgroundColor="Green"
+                                                TextColor="White"
+                                                CornerRadius="8"
+                                                CommandParameter="{Binding AssetUrl}"
+                                                Clicked="OnUpdateClicked"/>
+                                        <Button Grid.Column="1"
+                                                Text="View Online"
+                                                BackgroundColor="DarkSlateBlue"
+                                                TextColor="White"
+                                                CornerRadius="8"
+                                                CommandParameter="{Binding HtmlUrl}"
+                                                Clicked="OnViewOnlineClicked"/>
+                                    </Grid>
+                                </StackLayout>
+                            </StackLayout>
+                        </Frame>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            
+            <!-- Empty State -->
+            <Frame x:Name="EmptyStateCard" 
+                   IsVisible="False"
+                   BackgroundColor="LightYellow" 
+                   CornerRadius="12" 
+                   Padding="20">
+                <StackLayout Spacing="8" HorizontalOptions="Center">
+                    <Label Text="📦" 
+                           FontSize="30" 
+                           HorizontalOptions="Center"/>
+                    <Label Text="No Firmware Releases Found" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           TextColor="DarkGoldenrod"/>
+                    <Label Text="Pull down to refresh or check your internet connection" 
+                           FontSize="12" 
+                           HorizontalOptions="Center"
+                           TextColor="DarkGoldenrod"/>
+                </StackLayout>
+            </Frame>
+            
+            <!-- Update Progress -->
+            <Frame x:Name="UpdateProgressCard" 
+                   IsVisible="False"
+                   BackgroundColor="LightGreen" 
+                   CornerRadius="12" 
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="Firmware Update In Progress" 
+                           FontSize="16" 
+                           FontAttributes="Bold"
+                           TextColor="DarkGreen"/>
+                    <ProgressBar x:Name="UpdateProgressBar" 
+                                 Progress="0" 
+                                 ProgressColor="Green"/>
+                    <Label x:Name="UpdateStatusLabel" 
+                           Text="Preparing update..." 
+                           FontSize="14"
+                           HorizontalOptions="Center"
+                           TextColor="DarkGreen"/>
+                </StackLayout>
+            </Frame>
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

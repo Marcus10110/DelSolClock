@@ -6,6 +6,7 @@
 #include <SPI.h>
 #include <SPIFFS_ImageReader.h>
 #include <string>
+#include <cmath>
 
 // the adafruit font converter converts fonts at 141 DPI.
 // pixel size = pt size / 72 * 141.
@@ -22,6 +23,15 @@ using namespace Display;
 
 namespace Screens
 {
+    void PreloadImages()
+    {
+        const char* images_to_preload[] = { "/bluetooth.bmp", "/light_small.bmp", "/light_large.bmp", "/left.bmp", "/right.bmp" };
+        for( const char* image : images_to_preload )
+        {
+            Display::PreloadImage( ( char* )image );
+        }
+    }
+
     void Splash::Draw( Display::Display* display )
     {
         display->clear();
@@ -100,7 +110,8 @@ namespace Screens
         // headlight
         if( mHeadlight )
         {
-            display->DrawBMP( "/light_small.bmp", screen_rect.x + screen_rect.w - 32, 0 );
+            uint16_t color = 0x007F; // green = 10/255*63 = ~3. Blue = 255/255*63.
+            display->DrawBMP( "/light_small.bmp", screen_rect.x + screen_rect.w - 32, 0, false, color );
         }
 
         // bluetooth
@@ -111,7 +122,7 @@ namespace Screens
         }
         else
         {
-            display->DrawBMP( "/bluetooth_red.bmp", 0, top );
+            display->DrawBMP( "/bluetooth.bmp", 0, top, false, 0xF800 );
         }
     }
 
@@ -300,6 +311,83 @@ namespace Screens
 
         display->setFont( &JetBrainsMono_Thin10pt7b );
         display->write( line2.c_str() );
+    }
+
+    void CalibrationMissing::Draw( Display::Display* display )
+    {
+        display->clear();
+        display->setFont( &JetBrainsMono_Thin7pt7b );
+        display->WriteAligned( "Calibration missing\nPark on a flat surface\nThen press M to calibrate",
+                               Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+    }
+
+    void GMeter::Draw( Display::Display* display )
+    {
+        display->clear();
+        display->setFont( &JetBrainsMono_Thin7pt7b );
+
+        // draw rings
+        int center_x = 129 + 50;
+        int center_y = display->height() / 2;
+        constexpr uint16_t line_color = 0xFFFF;
+        constexpr uint16_t color = 0xF800;
+        constexpr double max_g_ring = 0.6;
+        constexpr double max_g_graph = 1.0;
+        display->drawCircle( center_x, center_y, 50, line_color );
+        display->drawCircle( center_x, center_y, 33, line_color );
+        display->drawCircle( center_x, center_y, 16, line_color );
+        display->drawCircle( center_x, center_y, 7, line_color );
+
+        // draw lines:
+        display->drawLine( center_x - 50, center_y, center_x + 50, center_y, line_color );
+        display->drawLine( center_x, center_y - 50, center_x, center_y + 50, line_color );
+
+        // add labels:
+        auto drawText = [&]( int16_t x, int16_t y, const char* text ) {
+            int16_t tx, ty;
+            display->setCursor( x, y + JetBrainsMono_Thin7pt7b.yAdvance );
+            display->print( text );
+        };
+        drawText( 159, -2, "Brake" );
+        drawText( 158, 115, "Accel" );
+        drawText( 8, 5, "Brake/Accel" );
+        drawText( 8, 63, "Lateral" );
+        drawText( 186, 72, ".2" );
+        drawText( 196, 83, ".4" );
+        drawText( 209, 96, ".6" );
+
+        // draw red dot.
+        int16_t dot_x = center_x + ( int16_t )( mLateralLive / max_g_ring * 50 );
+        int16_t dot_y = center_y + ( int16_t )( mBrakeLive / max_g_ring * 50 );
+        display->fillCircle( dot_x, dot_y, 5, color );
+
+        // draw graphs.
+        auto drawGraph = [&]( int row, const double( &history )[ GMeter::HistorySize ] ) {
+            constexpr int16_t height = 38;
+            constexpr int16_t width = 105;
+            int16_t x = 9;
+            int16_t y = row == 0 ? 25 : 83;
+
+            display->drawRect( x, y, width, height, line_color );
+            // now for the fun part. We want to fill in the graph(width-2) with HistorySize elements.
+            // to make life easy, we will just draw 1px at a time
+            for( int i = 1; i < width - 2; i++ )
+            {
+                int index = ( i - 1 ) * GMeter::HistorySize / ( width - 2 );
+                double element = history[ index ];
+                if( std::isinf( element ) )
+                {
+                    continue;
+                }
+                int16_t graph_y = ( int16_t )( ( element + max_g_graph ) / ( 2 * max_g_graph ) * ( height - 2 ) );
+                // clamp
+                graph_y = std::clamp<int16_t>( graph_y, int16_t( 0 ), height - 2 );
+                display->drawPixel( x - i + width - 2, y + height - 2 - graph_y, color );
+            }
+        };
+
+        drawGraph( 0, mBrakeHistory );
+        drawGraph( 1, mLateralHistory );
     }
 
     namespace QuarterMile

@@ -1,0 +1,55 @@
+## Build results
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+
+# User-specific files
+*.user
+*.userosscache
+*.suo
+*.sdf
+*.cache
+*.csproj.user
+
+# Visual Studio Code
+.vscode/
+.history/
+
+# Xamarin/MAUI specific
+*.apk
+*.ap_
+*.aab
+*.ipa
+*.app
+*.xcuserstate
+*.xcodeproj/*
+*.xcworkspace/*
+*.DS_Store
+
+# macOS artifacts
+*.DS_Store
+
+# Rider
+.idea/
+
+# Dotnet artifacts
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+*.nuspec
+*.psmdcp
+
+# Logs
+*.log
+
+# Other
+*.tlog
+*.vs/
+.vsconfig

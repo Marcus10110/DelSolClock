@@ -34,14 +34,17 @@ namespace Display
         int16_t h{ 0 };
     };
 
+    bool PreloadImage( char* path );
+
     class Display : public GFXcanvas16
     {
-        typedef void ( *ImageLoaderFn )( GFXcanvas16* destination, char* path, int16_t x, int16_t y, bool delete_after_draw );
+        typedef void ( *ImageLoaderFn )( GFXcanvas16* destination, char* path, int16_t x, int16_t y, bool delete_after_draw,
+                                         uint16_t monochrome_color );
 
       public:
         Display( ImageLoaderFn image_loader = nullptr );
         void clear();
-        void DrawBMP( char* path, int16_t x, int16_t y, bool delete_after_draw = false );
+        void DrawBMP( char* path, int16_t x, int16_t y, bool delete_after_draw = false, uint16_t monochrome_color = 0xFFFF );
         void GetTextLocation( const char* text, HorizontalAlignment horizontal, VerticalAlignment vertical, int16_t* left, int16_t* top,
                               Rect* within_region = nullptr, Rect* text_region = nullptr );
         void WriteAligned( const char* text, HorizontalAlignment horizontal, VerticalAlignment vertical, Rect* within_region = nullptr,

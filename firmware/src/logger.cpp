@@ -1,5 +1,5 @@
-// Logger.cpp
-#include "Logger.h"
+// logger.cpp
+#include "logger.h"
 #include <stdarg.h>
 #include <stdio.h>
 
