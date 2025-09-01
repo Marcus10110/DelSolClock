@@ -26,9 +26,10 @@ jobs:
       - name: write version.h
         run: |
           export BRANCH_OR_TAG=${GITHUB_REF#refs/*/}
+          cat firmware/include/version.h
           echo BRANCH_OR_TAG
-          echo "#define VERSION \"${BRANCH_OR_TAG}\"" > version.h
-          cat version.h
+          echo "#define VERSION \"${BRANCH_OR_TAG}\"" > firmware/include/version.h
+          cat firmware/include/version.h
 
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
