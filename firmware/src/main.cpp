@@ -41,7 +41,7 @@ enum class CurrentScreen
 
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
-#define DISABLE_SLEEP
+// #define DISABLE_SLEEP
 // define this to run the demo mode, which will cycle through all the screens.
 // #define DEMO_MODE
 namespace
