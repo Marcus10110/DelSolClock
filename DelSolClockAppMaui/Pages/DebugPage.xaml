@@ -78,6 +78,78 @@
                 </StackLayout>
             </Frame>
             
+            <!-- Device Control Card -->
+            <Frame BackgroundColor="LightCoral" CornerRadius="12" Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="Device Control" 
+                           FontSize="18" 
+                           FontAttributes="Bold" 
+                           TextColor="Black"/>
+                    <Label Text="Send commands to your Del Sol device for debugging and maintenance" 
+                           FontSize="14" 
+                           TextColor="DarkRed"/>
+                    
+                    <!-- Control Buttons -->
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <Button x:Name="RebootButton"
+                                Grid.Row="0" Grid.Column="0"
+                                Text="Reboot Device"
+                                BackgroundColor="Orange"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Margin="0,0,4,4"
+                                Clicked="OnRebootClicked"/>
+                        
+                        <Button x:Name="PrintButton"
+                                Grid.Row="0" Grid.Column="1"
+                                Text="Print Test Log"
+                                BackgroundColor="Purple"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Margin="4,0,0,4"
+                                Clicked="OnPrintClicked"/>
+                        
+                        <Button x:Name="CrashNowButton"
+                                Grid.Row="1" Grid.Column="0"
+                                Text="Crash Now"
+                                BackgroundColor="DarkRed"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Margin="0,4,4,4"
+                                Clicked="OnCrashNowClicked"/>
+                        
+                        <Button x:Name="CrashLaterButton"
+                                Grid.Row="1" Grid.Column="1"
+                                Text="Crash Later"
+                                BackgroundColor="Crimson"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Margin="4,4,0,4"
+                                Clicked="OnCrashLaterClicked"/>
+                        
+                        <Button x:Name="ClearButton"
+                                Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                Text="Clear Crash Dump"
+                                BackgroundColor="Red"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Margin="0,4,0,0"
+                                IsVisible="False"
+                                Clicked="OnClearClicked"/>
+                    </Grid>
+                </StackLayout>
+            </Frame>
+            
             <!-- Saved Crash Dumps Card -->
             <Frame BackgroundColor="LightYellow" CornerRadius="12" Padding="16">
                 <StackLayout Spacing="12">

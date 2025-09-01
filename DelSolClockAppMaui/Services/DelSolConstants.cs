@@ -21,6 +21,8 @@ public static class DelSolConstants
     
     // Debug Service Characteristics
     public static readonly Guid DebugStatusCharacteristicGuid = new("32a18dc5-fdda-4601-b5b7-dc2920ac3f37");
+    public static readonly Guid DebugDataCharacteristicGuid = new("2969eccf-48f1-4069-a662-1ae77fe69118");
+    public static readonly Guid DebugControlCharacteristicGuid = new("65376e10-7797-435b-ac52-14ac0fab362c");
     
     // Configuration
     public const int FirmwareChunkSize = 512;

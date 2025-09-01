@@ -85,11 +85,13 @@ public partial class DebugPage : ContentPage, INotifyPropertyChanged
             if( status.HasCrash )
             {
                 DownloadCard.IsVisible = true;
+                ClearButton.IsVisible = true;
                 StatusResultFrame.BackgroundColor = Colors.LightCoral;
             }
             else
             {
                 DownloadCard.IsVisible = false;
+                ClearButton.IsVisible = false;
                 StatusResultFrame.BackgroundColor = Colors.LightGreen;
             }
         }
@@ -125,7 +127,15 @@ public partial class DebugPage : ContentPage, INotifyPropertyChanged
                 } );
             } );
 
-            var success = await _delSolDevice.DebugService!.DownloadCrashDumpAsync( _delSolDevice.FirmwareVersion, progress );
+            // First get the current crash dump status to get chunk count
+            var status = await _delSolDevice.DebugService!.CheckCrashDumpStatusAsync();
+            if (!status.HasCrash || status.ChunkCount <= 0)
+            {
+                await DisplayAlert("Error", "No valid crash dump available or invalid chunk count.", "OK");
+                return;
+            }
+
+            var success = await _delSolDevice.DebugService!.DownloadCrashDumpAsync(_delSolDevice.FirmwareVersion, status.ChunkCount, progress);
 
             if( success )
             {
@@ -133,6 +143,7 @@ public partial class DebugPage : ContentPage, INotifyPropertyChanged
 
                 // Hide download section and refresh list
                 DownloadCard.IsVisible = false;
+                ClearButton.IsVisible = false;
                 StatusResultFrame.IsVisible = false;
                 await RefreshCrashDumpListAsync();
             }
@@ -229,6 +240,244 @@ public partial class DebugPage : ContentPage, INotifyPropertyChanged
         catch( Exception ex )
         {
             await DisplayAlert( "Error", $"Failed to delete file: {ex.Message}", "OK" );
+        }
+    }
+
+    private async void OnRebootClicked( object sender, EventArgs e )
+    {
+        try
+        {
+            if( !_delSolDevice.IsConnected )
+            {
+                await DisplayAlert( "Not Connected", "Please connect to your Del Sol device first from the Status tab.", "OK" );
+                return;
+            }
+
+            if( _delSolDevice.DebugService == null )
+            {
+                await DisplayAlert( "Error", "Debug service not available. Please ensure your device supports debugging.", "OK" );
+                return;
+            }
+
+            var confirm = await DisplayAlert( "Confirm Reboot", 
+                "Are you sure you want to reboot the device? This will disconnect the BLE connection.", 
+                "Reboot", "Cancel" );
+
+            if( confirm )
+            {
+                RebootButton.IsEnabled = false;
+                RebootButton.Text = "Rebooting...";
+
+                var success = await _delSolDevice.DebugService.SendDebugControlCommandAsync( "REBOOT" );
+                
+                if( success )
+                {
+                    await DisplayAlert( "Success", "Reboot command sent successfully. The device will restart shortly.", "OK" );
+                }
+                else
+                {
+                    await DisplayAlert( "Error", "Failed to send reboot command.", "OK" );
+                }
+            }
+        }
+        catch( Exception ex )
+        {
+            await DisplayAlert( "Error", $"Failed to reboot device: {ex.Message}", "OK" );
+        }
+        finally
+        {
+            RebootButton.IsEnabled = true;
+            RebootButton.Text = "Reboot Device";
+        }
+    }
+
+    private async void OnClearClicked( object sender, EventArgs e )
+    {
+        try
+        {
+            if( !_delSolDevice.IsConnected )
+            {
+                await DisplayAlert( "Not Connected", "Please connect to your Del Sol device first from the Status tab.", "OK" );
+                return;
+            }
+
+            if( _delSolDevice.DebugService == null )
+            {
+                await DisplayAlert( "Error", "Debug service not available. Please ensure your device supports debugging.", "OK" );
+                return;
+            }
+
+            var confirm = await DisplayAlert( "Confirm Clear", 
+                "Are you sure you want to clear the crash dump from the device? This action cannot be undone.", 
+                "Clear", "Cancel" );
+
+            if( confirm )
+            {
+                ClearButton.IsEnabled = false;
+                ClearButton.Text = "Clearing...";
+
+                var success = await _delSolDevice.DebugService.SendDebugControlCommandAsync( "CLEAR" );
+                
+                if( success )
+                {
+                    await DisplayAlert( "Success", "Crash dump cleared successfully.", "OK" );
+                    
+                    // Hide the clear button and download card since crash is cleared
+                    ClearButton.IsVisible = false;
+                    DownloadCard.IsVisible = false;
+                    StatusResultFrame.IsVisible = false;
+                }
+                else
+                {
+                    await DisplayAlert( "Error", "Failed to clear crash dump.", "OK" );
+                }
+            }
+        }
+        catch( Exception ex )
+        {
+            await DisplayAlert( "Error", $"Failed to clear crash dump: {ex.Message}", "OK" );
+        }
+        finally
+        {
+            ClearButton.IsEnabled = true;
+            ClearButton.Text = "Clear Crash Dump";
+        }
+    }
+
+    private async void OnPrintClicked( object sender, EventArgs e )
+    {
+        try
+        {
+            if( !_delSolDevice.IsConnected )
+            {
+                await DisplayAlert( "Not Connected", "Please connect to your Del Sol device first from the Status tab.", "OK" );
+                return;
+            }
+
+            if( _delSolDevice.DebugService == null )
+            {
+                await DisplayAlert( "Error", "Debug service not available. Please ensure your device supports debugging.", "OK" );
+                return;
+            }
+
+            PrintButton.IsEnabled = false;
+            PrintButton.Text = "Printing...";
+
+            var success = await _delSolDevice.DebugService.SendDebugControlCommandAsync( "PRINT" );
+            
+            if( success )
+            {
+                await DisplayAlert( "Success", "Print test log command sent successfully. Check the device logs for output.", "OK" );
+            }
+            else
+            {
+                await DisplayAlert( "Error", "Failed to send print command.", "OK" );
+            }
+        }
+        catch( Exception ex )
+        {
+            await DisplayAlert( "Error", $"Failed to send print command: {ex.Message}", "OK" );
+        }
+        finally
+        {
+            PrintButton.IsEnabled = true;
+            PrintButton.Text = "Print Test Log";
+        }
+    }
+
+    private async void OnCrashNowClicked( object sender, EventArgs e )
+    {
+        try
+        {
+            if( !_delSolDevice.IsConnected )
+            {
+                await DisplayAlert( "Not Connected", "Please connect to your Del Sol device first from the Status tab.", "OK" );
+                return;
+            }
+
+            if( _delSolDevice.DebugService == null )
+            {
+                await DisplayAlert( "Error", "Debug service not available. Please ensure your device supports debugging.", "OK" );
+                return;
+            }
+
+            var confirm = await DisplayAlert( "Confirm Crash Test", 
+                "Are you sure you want to crash the device now? This will cause an immediate assert on the current thread for testing purposes.", 
+                "Crash Now", "Cancel" );
+
+            if( confirm )
+            {
+                CrashNowButton.IsEnabled = false;
+                CrashNowButton.Text = "Crashing...";
+
+                var success = await _delSolDevice.DebugService.SendDebugControlCommandAsync( "ASSERT" );
+                
+                if( success )
+                {
+                    await DisplayAlert( "Success", "Crash command sent successfully. The device should assert immediately.", "OK" );
+                }
+                else
+                {
+                    await DisplayAlert( "Error", "Failed to send crash command.", "OK" );
+                }
+            }
+        }
+        catch( Exception ex )
+        {
+            await DisplayAlert( "Error", $"Failed to send crash command: {ex.Message}", "OK" );
+        }
+        finally
+        {
+            CrashNowButton.IsEnabled = true;
+            CrashNowButton.Text = "Crash Now";
+        }
+    }
+
+    private async void OnCrashLaterClicked( object sender, EventArgs e )
+    {
+        try
+        {
+            if( !_delSolDevice.IsConnected )
+            {
+                await DisplayAlert( "Not Connected", "Please connect to your Del Sol device first from the Status tab.", "OK" );
+                return;
+            }
+
+            if( _delSolDevice.DebugService == null )
+            {
+                await DisplayAlert( "Error", "Debug service not available. Please ensure your device supports debugging.", "OK" );
+                return;
+            }
+
+            var confirm = await DisplayAlert( "Confirm Crash Test", 
+                "Are you sure you want to schedule a crash? This will cause an assert on the main thread for testing purposes.", 
+                "Crash Later", "Cancel" );
+
+            if( confirm )
+            {
+                CrashLaterButton.IsEnabled = false;
+                CrashLaterButton.Text = "Scheduling...";
+
+                var success = await _delSolDevice.DebugService.SendDebugControlCommandAsync( "ASSERT_LATER" );
+                
+                if( success )
+                {
+                    await DisplayAlert( "Success", "Crash command sent successfully. The device will assert on the main thread shortly.", "OK" );
+                }
+                else
+                {
+                    await DisplayAlert( "Error", "Failed to send crash command.", "OK" );
+                }
+            }
+        }
+        catch( Exception ex )
+        {
+            await DisplayAlert( "Error", $"Failed to send crash command: {ex.Message}", "OK" );
+        }
+        finally
+        {
+            CrashLaterButton.IsEnabled = true;
+            CrashLaterButton.Text = "Crash Later";
         }
     }
 }
