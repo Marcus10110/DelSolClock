@@ -337,12 +337,12 @@ namespace Bluetooth
         BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
         oAdvertisementData.setFlags( 0x06 ); // was 0x01
         oAdvertisementData.setName( device_name );
-        oAdvertisementData.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
+        oAdvertisementData.setPartialServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
         // no service solicitation in the advertisement data, because it doesn't do anything useful
 
         // scan response data includes the complete list of our capabilities and solicitations.
         BLEAdvertisementData scan_response_data;
-        scan_response_data.setCompleteServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
+        scan_response_data.setPartialServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
         setServiceSolicitation( scan_response_data, BLEUUID( APPLE_MUSIC_SERVICE_UUID ) );
         setServiceSolicitation( scan_response_data, BLEUUID( ANCS_SERVICE_UUID ) );
 

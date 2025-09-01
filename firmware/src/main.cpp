@@ -17,6 +17,7 @@
 #include "demo.h"
 #include "quarter_mile.h"
 #include "logger.h"
+#include "debug_service.h"
 
 #include <TinyGPSPlus.h>
 
@@ -198,6 +199,7 @@ void HandleStatusUpdate( const CarIO::CarStatus& car_status )
 void loop()
 {
     esp_task_wdt_reset();
+    DebugService::HandleAssertCase();
     static uint32_t last_memory_update = millis();
     if( millis() - last_memory_update > 5000 )
     {

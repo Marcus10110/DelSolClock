@@ -5,4 +5,5 @@ class BLEServer;
 namespace DebugService
 {
     bool StartDebugService( BLEServer* server );
+    void HandleAssertCase();
 }
