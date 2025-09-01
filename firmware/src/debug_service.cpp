@@ -128,17 +128,14 @@ namespace DebugService
         {
             void onRead( BLECharacteristic* pCharacteristic, esp_ble_gatts_cb_param_t* param ) override
             {
-                // Handle read requests for the debug data characteristic
-                LOG_TRACE( "Debug data characteristic read!" );
-
                 if( CurrentSlice < SliceCount )
                 {
                     WriteSliceToCharacteristic( CurrentSlice );
                     CurrentSlice++;
-                }
-                else
-                {
-                    LOG_TRACE( "No more slices to read!" );
+                    if( CurrentSlice >= SliceCount )
+                    {
+                        CurrentSlice = 0;
+                    }
                 }
             }
         };
@@ -167,12 +164,14 @@ namespace DebugService
                 else if( rxValue == "ASSERT_LATER" )
                 {
                     LOG_INFO( "setting flag to assert later..." );
+                    // assert from the main thread instead.
                     ShouldAssert = true;
                 }
                 else if( rxValue == "CLEAR" )
                 {
                     LOG_INFO( "Clearing crash data..." );
                     esp_core_dump_image_erase();
+                    DebugStatusCharacteristic->setValue( "NOCRASH" );
                     LOG_INFO( "crash data cleared." );
                 }
                 else if( rxValue == "PRINT" )
