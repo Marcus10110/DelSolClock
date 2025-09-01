@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DelSolClockAppMaui.Pages.DebugPage"
+             Title="Debug">
+             
+    <ScrollView>
+        <StackLayout Padding="16" Spacing="16">
+            
+            <!-- Device Status Card -->
+            <Frame BackgroundColor="LightBlue" CornerRadius="12" Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="Crash Dump Status" 
+                           FontSize="20" 
+                           FontAttributes="Bold" 
+                           TextColor="Black"/>
+                    <Label Text="Check your Del Sol device for crash dumps and download them for debugging" 
+                           FontSize="14" 
+                           TextColor="DarkBlue"/>
+                    
+                    <Button x:Name="CheckStatusButton"
+                            Text="Check for Crash Dumps"
+                            BackgroundColor="DarkBlue"
+                            TextColor="White"
+                            CornerRadius="8"
+                            Clicked="OnCheckStatusClicked"/>
+                    
+                    <!-- Status Display -->
+                    <Frame x:Name="StatusResultFrame" 
+                           IsVisible="False"
+                           BackgroundColor="White" 
+                           CornerRadius="8" 
+                           Padding="12"
+                           Margin="0,8,0,0">
+                        <StackLayout>
+                            <Label x:Name="StatusResultLabel" 
+                                   Text="" 
+                                   FontSize="16" 
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"/>
+                        </StackLayout>
+                    </Frame>
+                </StackLayout>
+            </Frame>
+            
+            <!-- Download Section -->
+            <Frame x:Name="DownloadCard" 
+                   IsVisible="False"
+                   BackgroundColor="LightGreen" 
+                   CornerRadius="12" 
+                   Padding="16">
+                <StackLayout Spacing="12">
+                    <Label Text="Download Crash Dump" 
+                           FontSize="18" 
+                           FontAttributes="Bold" 
+                           TextColor="Black"/>
+                    
+                    <Button x:Name="DownloadButton"
+                            Text="Download Crash Dump"
+                            BackgroundColor="Green"
+                            TextColor="White"
+                            CornerRadius="8"
+                            Clicked="OnDownloadClicked"/>
+                    
+                    <!-- Progress Bar -->
+                    <StackLayout x:Name="ProgressSection" IsVisible="False" Spacing="8">
+                        <Label Text="Downloading..." 
+                               FontSize="14" 
+                               HorizontalOptions="Center"/>
+                        <ProgressBar x:Name="DownloadProgressBar" 
+                                     Progress="0" 
+                                     ProgressColor="Green"/>
+                        <Label x:Name="ProgressLabel" 
+                               Text="0%" 
+                               FontSize="12" 
+                               HorizontalOptions="Center"/>
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+            
+            <!-- Saved Crash Dumps Card -->
+            <Frame BackgroundColor="LightYellow" CornerRadius="12" Padding="16">
+                <StackLayout Spacing="12">
+                    <StackLayout Orientation="Horizontal">
+                        <Label Text="Saved Crash Dumps" 
+                               FontSize="18" 
+                               FontAttributes="Bold" 
+                               TextColor="Black"
+                               VerticalOptions="Center"
+                               HorizontalOptions="FillAndExpand"/>
+                        <Button x:Name="RefreshButton"
+                                Text="Refresh"
+                                BackgroundColor="Orange"
+                                TextColor="White"
+                                CornerRadius="6"
+                                FontSize="12"
+                                Padding="8,4"
+                                Clicked="OnRefreshClicked"/>
+                    </StackLayout>
+                    
+                    <!-- Empty State -->
+                    <Label x:Name="EmptyStateLabel"
+                           Text="No crash dumps found. Download crash dumps from your device to see them here."
+                           FontSize="14"
+                           TextColor="Gray"
+                           IsVisible="True"
+                           HorizontalOptions="Center"
+                           Margin="0,16"/>
+                    
+                    <!-- Crash Dumps List -->
+                    <CollectionView x:Name="CrashDumpsCollection" 
+                                    SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Frame Margin="0,0,0,8" 
+                                       BackgroundColor="White" 
+                                       CornerRadius="8" 
+                                       HasShadow="True"
+                                       Padding="12">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <!-- File Info -->
+                                        <StackLayout Grid.Row="0" Grid.Column="0" Spacing="4">
+                                            <Label Text="{Binding DisplayName}" 
+                                                   FontSize="16" 
+                                                   FontAttributes="Bold"
+                                                   TextColor="Black"/>
+                                            <Label Text="{Binding FirmwareVersion, StringFormat='Firmware: {0}'}" 
+                                                   FontSize="12" 
+                                                   TextColor="Gray"/>
+                                        </StackLayout>
+                                        
+                                        <!-- Action Buttons -->
+                                        <StackLayout Grid.Row="0" Grid.Column="1" 
+                                                     Orientation="Horizontal" 
+                                                     Spacing="8"
+                                                     VerticalOptions="Center">
+                                            <Button Text="Share"
+                                                    BackgroundColor="Blue"
+                                                    TextColor="White"
+                                                    FontSize="12"
+                                                    Padding="8,4"
+                                                    CornerRadius="4"
+                                                    CommandParameter="{Binding .}"
+                                                    Clicked="OnShareClicked"/>
+                                            <Button Text="Delete"
+                                                    BackgroundColor="Red"
+                                                    TextColor="White"
+                                                    FontSize="12"
+                                                    Padding="8,4"
+                                                    CornerRadius="4"
+                                                    CommandParameter="{Binding .}"
+                                                    Clicked="OnDeleteClicked"/>
+                                        </StackLayout>
+                                        
+                                        <!-- Additional Info -->
+                                        <StackLayout Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" 
+                                                     Orientation="Horizontal" 
+                                                     Spacing="16"
+                                                     Margin="0,4,0,0">
+                                            <Label Text="{Binding SizeText}" 
+                                                   FontSize="12" 
+                                                   TextColor="Gray"/>
+                                            <Label Text="{Binding DateText}" 
+                                                   FontSize="12" 
+                                                   TextColor="Gray"/>
+                                        </StackLayout>
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </StackLayout>
+            </Frame>
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

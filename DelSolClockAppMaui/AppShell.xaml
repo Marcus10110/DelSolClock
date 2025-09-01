@@ -6,6 +6,7 @@
     <TabBar>
         <ShellContent Title="Status" ContentTemplate="{DataTemplate pages:StatusPage}" />
         <ShellContent Title="Firmware" ContentTemplate="{DataTemplate pages:UpdatePage}" />
+        <ShellContent Title="Debug" ContentTemplate="{DataTemplate pages:DebugPage}" />
         <ShellContent Title="Logs" ContentTemplate="{DataTemplate pages:LogPage}" />
     </TabBar>
 </Shell>

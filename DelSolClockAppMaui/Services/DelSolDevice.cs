@@ -14,6 +14,7 @@ public class DelSolDevice : IDisposable
 {
     private BleConnectionManager? _connectionManager;
     private VehicleService? _vehicleService;
+    private DebugService? _debugService;
     private readonly ILogger<DelSolDevice> _logger;
     private bool _disposed = false;
     private bool _isInitialized = false;
@@ -22,6 +23,7 @@ public class DelSolDevice : IDisposable
     public bool IsConnected => _connectionManager?.IsConnected ?? false;
     public string? ConnectedDeviceName => _connectionManager?.ConnectedDeviceName;
     public string FirmwareVersion { get; private set; } = "Unknown";
+    public DebugService? DebugService => _debugService;
 
     // Events
     public event EventHandler<ConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
@@ -67,6 +69,10 @@ public class DelSolDevice : IDisposable
             _vehicleService.StatusChanged += OnVehicleStatusChanged;
             _vehicleService.BatteryChanged += OnBatteryStatusChanged;
 
+            // Create debug service
+            var debugLogger = LoggerFactory.Create( builder => builder.AddDebug() ).CreateLogger<DebugService>();
+            _debugService = new DebugService( debugLogger );
+
             _isInitialized = true;
             _logger.LogInformation( "DelSol device manager initialized successfully" );
             return true;
@@ -78,7 +84,7 @@ public class DelSolDevice : IDisposable
         }
     }
 
-    public async Task<List<DiscoveredDevice>> ScanForDevicesAsync( TimeSpan timeout = default)
+    public async Task<List<DiscoveredDevice>> ScanForDevicesAsync( TimeSpan timeout = default )
     {
         if( _connectionManager == null || !_isInitialized )
         {
@@ -152,6 +158,19 @@ public class DelSolDevice : IDisposable
                     return false;
                 }
 
+                // Initialize debug service (optional - don't fail connection if debug service unavailable)
+                if( _debugService != null )
+                {
+                    try
+                    {
+                        await _debugService.InitializeAsync( _connectionManager.ConnectedDevice );
+                    }
+                    catch( Exception ex )
+                    {
+                        _logger.LogWarning( ex, "Debug service initialization failed - continuing without debug functionality" );
+                    }
+                }
+
                 // wait 2 seconds for service to stabilize
                 await Task.Delay( 2000 );
 
@@ -178,8 +197,9 @@ public class DelSolDevice : IDisposable
         {
             _logger.LogInformation( "Disconnecting from DelSol device" );
 
-            // Dispose vehicle service to stop notifications
+            // Dispose services to stop notifications
             _vehicleService?.Dispose();
+            _debugService?.Dispose();
 
             // Disconnect BLE
             await _connectionManager.DisconnectAsync();
@@ -557,9 +577,9 @@ public class DelSolDevice : IDisposable
             {
                 FirmwareVersion = System.Text.Encoding.UTF8.GetString( versionResult.data );
                 _logger.LogInformation( "Read firmware version: {Version}", FirmwareVersion );
-                
+
                 // Fire firmware version changed event
-                FirmwareVersionChanged?.Invoke(this, EventArgs.Empty);
+                FirmwareVersionChanged?.Invoke( this, EventArgs.Empty );
             }
         }
         catch( Exception ex )
@@ -577,6 +597,7 @@ public class DelSolDevice : IDisposable
         if( !e.IsConnected )
         {
             _vehicleService?.Dispose();
+            _debugService?.Dispose();
             FirmwareVersion = "Unknown";
         }
 
@@ -607,19 +628,21 @@ public class DelSolDevice : IDisposable
         {
             // Disconnect and clean up
             // Don't use .Wait() as it can cause deadlocks - let disposal happen naturally
-            _ = Task.Run(async () => {
-                try 
+            _ = Task.Run( async () =>
+            {
+                try
                 {
                     await DisconnectAsync();
                 }
-                catch (Exception ex)
+                catch( Exception ex )
                 {
-                    _logger.LogWarning(ex, "Error during async disconnect in disposal");
+                    _logger.LogWarning( ex, "Error during async disconnect in disposal" );
                 }
-            });
+            } );
 
             // Dispose services
             _vehicleService?.Dispose();
+            _debugService?.Dispose();
             _connectionManager?.Dispose();
 
             // Unsubscribe from events

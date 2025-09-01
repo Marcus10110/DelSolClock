@@ -23,6 +23,7 @@ namespace DelSolClockAppMaui
             // Register pages
             builder.Services.AddTransient<StatusPage>();
             builder.Services.AddTransient<UpdatePage>();
+            builder.Services.AddTransient<DebugPage>();
             builder.Services.AddTransient<LogPage>();
 
             // Configure logging
