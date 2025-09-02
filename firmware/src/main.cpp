@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "apple_media_service.h"
 #include "apple_notification_center_service.h"
+#include "notification_processor.h"
 #include "current_time_service.h"
 #include "apple_media_service.h"
 #include "tft.h"
@@ -18,6 +19,7 @@
 #include "quarter_mile.h"
 #include "logger.h"
 #include "debug_service.h"
+#include "utilities.h"
 
 #include <TinyGPSPlus.h>
 
@@ -69,10 +71,10 @@ void setup()
     LOG_TRACE( "Del Sol Clock Booting" );
 
     Serial.println( "Configuring WDT..." );
-    esp_task_wdt_init( 20, true ); // initial 20 second timeout to totally handle init time, we reduce it later.
+    esp_task_wdt_init( 50, true ); // huge because I have not done a great job of resetting the watchdog timer.
     esp_task_wdt_add( NULL );
 
-    LOG_TRACE( "free memory: %d", ESP.getFreeHeap() );
+    PRINT_MEMORY_USAGE();
 
     // show the current clock source. If it's not 1 (the external 32kHz crystal), then either (A) the crystal is not present, or (B) the
     // bootloader & esp32-arduino library was not configured for it.
@@ -87,13 +89,14 @@ void setup()
     Gps::Begin();
     Motion::Begin();
     Screens::PreloadImages();
+    NotificationProcessor::Init();
 
     {
         // write the splash screen to the display buffer before starting BLE. this uses a huge amount of RAM temporarily.
-        // Screens::Splash splash;
-        // splash.Draw( &gDisplay );
-        // gTft->DrawCanvas( &gDisplay );
-        gTft->DrawBMPDDirect( "/OldSols.bmp" );
+        Screens::Splash splash;
+        splash.Draw( &gDisplay );
+        gTft->DrawCanvas( &gDisplay );
+        // gTft->DrawBMPDDirect( "/OldSols.bmp" );
     }
 
     Bluetooth::Begin( BluetoothDeviceName );
@@ -136,7 +139,6 @@ void setup()
         delay( 1000 );
         // TODO: should we keep this screen up until we get the first connection? Especially since we don't know the time yet?
     }
-    esp_task_wdt_init( 5, true );
 }
 
 void HandlePowerState( const CarIO::CarStatus& car_status )
@@ -204,7 +206,7 @@ void loop()
     if( millis() - last_memory_update > 5000 )
     {
         last_memory_update = millis();
-        LOG_TRACE( "free memory: %d", ESP.getFreeHeap() );
+        PRINT_MEMORY_USAGE();
     }
     {
         auto motion_state = Motion::GetState();
@@ -242,9 +244,6 @@ void loop()
         return; // don't do anything else while we're updating.
     }
     Bluetooth::Service();
-#if 1
-    AppleNotifications::Service();
-#endif
     Gps::Service();
     CarIO::Service();
     auto car_status = CarIO::GetStatus();
@@ -346,7 +345,12 @@ void loop()
     {
 #if 1
         Screens::Notifications notifications;
-        notifications.mHasNotification = AppleNotifications::GetLatestNotification( notifications.mNotification );
+        AppleNotifications::NotificationSummary latest_notification;
+        notifications.mHasNotification = NotificationProcessor::GetLatestNotification( latest_notification );
+        notifications.mNotification.mAppIdentifier = latest_notification.mAppIdentifier.value_or( "--" );
+        notifications.mNotification.mTitle = latest_notification.mTitle.value_or( "--" );
+        notifications.mNotification.mMessage = latest_notification.mMessage.value_or( "--" );
+        notifications.mNotification.mSubtitle = latest_notification.mSubtitle.value_or( "--" );
         notifications.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
 #endif
@@ -354,7 +358,12 @@ void loop()
     else if( gCurrentScreen == CurrentScreen::Navigation )
     {
         Screens::Navigation navigation;
-        navigation.mHasNotification = AppleNotifications::GetLatestNavigationNotification( navigation.mNotification );
+        AppleNotifications::NotificationSummary notification;
+        navigation.mHasNotification = NotificationProcessor::GetLatestNavigationNotification( notification );
+        navigation.mNotification.mAppIdentifier = notification.mAppIdentifier.value_or( "--" );
+        navigation.mNotification.mTitle = notification.mTitle.value_or( "--" );
+        navigation.mNotification.mMessage = notification.mMessage.value_or( "--" );
+        navigation.mNotification.mSubtitle = notification.mSubtitle.value_or( "--" );
         navigation.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
     }

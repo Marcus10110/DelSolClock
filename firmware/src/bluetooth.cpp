@@ -20,6 +20,7 @@
 #include "debug_service.h"
 #include "ble_ota.h"
 #include "logger.h"
+#include "utilities.h"
 
 #define APPLE_MUSIC_SERVICE_UUID "89D3502B-0F36-433A-8EF4-C502AD55F8DC"
 
@@ -185,6 +186,8 @@ namespace Bluetooth
                 Client = nullptr;
             }
 
+            LOG_TRACE( "HandleConnection started" );
+            PRINT_MEMORY_USAGE();
             Client = BLEDevice::createClient();
 
             Security.setAuthenticationMode( ESP_LE_AUTH_REQ_SC_BOND );
@@ -227,13 +230,14 @@ namespace Bluetooth
             // memcpy( peer_address, Client->getPeerAddress().getNative(), sizeof( esp_bd_addr_t ) );
             // Server->updateConnParams( peer_address, 6, 12, 0, 400 );
 
-
+            esp_task_wdt_reset();
             if( !AppleMediaService::StartMediaService( Client ) )
             {
                 // we support continuing without these services, because windows does not provide them.
                 LOG_ERROR( "StartMediaService failed" );
             }
 
+            esp_task_wdt_reset();
             CurrentTimeService::CurrentTime time;
             if( !CurrentTimeService::StartTimeService( Client, &time ) )
             {
@@ -260,6 +264,7 @@ namespace Bluetooth
 
 // Apple Notification Service disabled, not used.
 #if 1
+            esp_task_wdt_reset();
             if( !AppleNotifications::StartNotificationService( Client ) )
             {
                 LOG_ERROR( "failed to start the notification service" );
@@ -271,6 +276,9 @@ namespace Bluetooth
             }
 
 #endif
+
+            LOG_TRACE( "HandleConnection finished" );
+            PRINT_MEMORY_USAGE();
         }
 
     }
@@ -279,11 +287,17 @@ namespace Bluetooth
     void Begin( const std::string& device_name )
     {
         LOG_TRACE( "Bluetooth::Begin()" );
+        PRINT_MEMORY_USAGE_MSG( "start" );
+
+        esp_bt_controller_mem_release( ESP_BT_MODE_CLASSIC_BT );
+        PRINT_MEMORY_USAGE_MSG( "after release" );
 
         Ended = false;
         BLEDevice::init( device_name );
+        PRINT_MEMORY_USAGE_MSG( "after init" );
         PrintBondList();
         Server = BLEDevice::createServer();
+        PRINT_MEMORY_USAGE_MSG( "after create server" );
         Server->setCallbacks( new GetAddressServerCallbacks() );
 
         const uint8_t* address = esp_bt_dev_get_address();
@@ -310,6 +324,7 @@ namespace Bluetooth
         }
 
         // Add the OTA service.
+        PRINT_MEMORY_USAGE_MSG( "before BleOta Begin" );
         BleOta::Begin( Server );
 
         auto vechicle_service = Server->createService( DELSOL_VEHICLE_SERVICE_UUID );
@@ -360,6 +375,9 @@ namespace Bluetooth
         Security.setCapability( ESP_IO_CAP_OUT ); // This value changes between server and client. Is it needed?
         Security.setInitEncryptionKey( ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK ); // not sure how this is used either.
         advertising->start();
+
+        LOG_TRACE( "Bluetooth::Begin finished" );
+        PRINT_MEMORY_USAGE();
     }
     void End()
     {

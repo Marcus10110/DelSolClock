@@ -1,6 +1,7 @@
 #include "debug_service.h"
 
 #include "logger.h"
+#include "utilities.h"
 
 #include "BLE2902.h"
 #include <BLEServer.h>
@@ -193,6 +194,7 @@ namespace DebugService
     bool StartDebugService( BLEServer* server )
     {
         LOG_TRACE( "creating debug service" );
+        PRINT_MEMORY_USAGE();
         auto debug_service = server->createService( BLEUUID( DEBUG_SERVICE_UUID ) );
         LOG_TRACE( "creating debug status characteristic" );
         DebugStatusCharacteristic =
@@ -235,6 +237,8 @@ namespace DebugService
         }
         LOG_TRACE( "starting debug service" );
         debug_service->start();
+        LOG_TRACE( "Debug service started" );
+        PRINT_MEMORY_USAGE();
         return true;
     }
 

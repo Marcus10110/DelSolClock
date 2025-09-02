@@ -1,6 +1,7 @@
 #include "ble_ota.h"
 #include "version.h"
 #include "logger.h"
+#include "utilities.h"
 
 #include <Arduino.h>
 #include <BLEServer.h>
@@ -122,6 +123,8 @@ namespace BleOta
     }
     void Begin( BLEServer* server )
     {
+        LOG_TRACE( "Starting OTA service" );
+        PRINT_MEMORY_USAGE();
         auto status = esp_ota_begin( esp_ota_get_next_update_partition( NULL ), OTA_SIZE_UNKNOWN, &UpdateHandle );
         LOG_TRACE( "esp_ota_begin: %i", status );
         if( status != ESP_OK )
@@ -139,6 +142,7 @@ namespace BleOta
         version_characteristic->setValue( VERSION );
         service->start();
         LOG_TRACE( "Started OTA service. Current version: %s", VERSION );
+        PRINT_MEMORY_USAGE();
     }
 
     bool IsInProgress( uint32_t* bytes_received )

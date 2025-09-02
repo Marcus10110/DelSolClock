@@ -7,7 +7,19 @@
 
 namespace Screens
 {
+    namespace Detail
+    {
+        struct DisplayNotification
+        {
+            std::string mTitle;
+            std::string mSubtitle;
+            std::string mMessage;
+            std::string mAppIdentifier;
+        };
+    }
     void PreloadImages();
+
+
     class Screen
     {
       public:
@@ -74,7 +86,7 @@ namespace Screens
     {
       public:
         bool mHasNotification;
-        AppleNotifications::DisplayNotification mNotification;
+        Detail::DisplayNotification mNotification;
         void Draw( Display::Display* display ) override;
     };
 
@@ -82,7 +94,7 @@ namespace Screens
     {
       public:
         bool mHasNotification;
-        AppleNotifications::DisplayNotification mNotification;
+        Detail::DisplayNotification mNotification;
         void Draw( Display::Display* display ) override;
     };
 

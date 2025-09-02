@@ -1,5 +1,6 @@
 #include "current_time_service.h"
 #include "logger.h"
+#include "utilities.h"
 
 #include <BLEClient.h>
 #include <Arduino.h>
@@ -115,6 +116,9 @@ namespace CurrentTimeService
     {
         assert( client != nullptr );
 
+        LOG_TRACE( "Starting Time Service" );
+        PRINT_MEMORY_USAGE();
+
         if( !client->isConnected() )
         {
             LOG_ERROR( "client not connected" );
@@ -145,19 +149,19 @@ namespace CurrentTimeService
                 time.Dump();
             } );
 
-        // TODO: add support for the local time characteristic
-        auto local_time_characteristic = time_service->getCharacteristic( LOCAL_TIME_INFORMATION_UUID );
-        if( !local_time_characteristic )
-        {
-            LOG_WARN( "optional local time characteristic not found" );
-        }
+        // // TODO: add support for the local time characteristic
+        // auto local_time_characteristic = time_service->getCharacteristic( LOCAL_TIME_INFORMATION_UUID );
+        // if( !local_time_characteristic )
+        // {
+        //     LOG_WARN( "optional local time characteristic not found" );
+        // }
 
-        // TODO: add support for the reference time characteristic
-        auto reference_time_characteristic = time_service->getCharacteristic( REFERENCE_TIME_INFORMATION );
-        if( !reference_time_characteristic )
-        {
-            LOG_WARN( "optional reference time characteristic not found" );
-        }
+        // // TODO: add support for the reference time characteristic
+        // auto reference_time_characteristic = time_service->getCharacteristic( REFERENCE_TIME_INFORMATION );
+        // if( !reference_time_characteristic )
+        // {
+        //     LOG_WARN( "optional reference time characteristic not found" );
+        // }
 
         if( current_time != nullptr )
         {
@@ -167,6 +171,8 @@ namespace CurrentTimeService
         }
 
         gCurrentTimeCharacteristic = current_time_characteristic;
+        LOG_TRACE( "Current Time Service started" );
+        PRINT_MEMORY_USAGE();
         return true;
     }
 

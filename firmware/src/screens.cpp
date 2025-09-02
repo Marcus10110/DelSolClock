@@ -23,6 +23,17 @@ using namespace Display;
 
 namespace Screens
 {
+    namespace
+    {
+        std::string trim( const std::string& str )
+        {
+            size_t first = str.find_first_not_of( ' ' );
+            if( first == std::string::npos )
+                return "";
+            size_t last = str.find_last_not_of( ' ' );
+            return str.substr( first, ( last - first + 1 ) );
+        }
+    }
     void PreloadImages()
     {
         const char* images_to_preload[] = { "/bluetooth.bmp", "/light_small.bmp", "/light_large.bmp", "/left.bmp", "/right.bmp" };
@@ -239,7 +250,7 @@ namespace Screens
         display->setFont( &JetBrainsMono_Thin14pt7b );
         display->WriteAligned( "Notifications", Display::HorizontalAlignment::Center, Display::VerticalAlignment::Top );
 
-        String summary = mNotification.mTitle + "\n" + mNotification.mSubtitle + "\n" + mNotification.mMessage;
+        std::string summary = mNotification.mTitle + "\n" + mNotification.mSubtitle + "\n" + mNotification.mMessage;
 
         display->setFont( &JetBrainsMono_Thin7pt7b );
         display->WriteAligned( summary.c_str(), Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
@@ -261,8 +272,8 @@ namespace Screens
 
         const char* left_prefix = "Turn left onto";
         const char* right_prefix = "Turn right onto";
-        bool is_left = mNotification.mMessage.startsWith( left_prefix );
-        bool is_right = mNotification.mMessage.startsWith( right_prefix );
+        bool is_left = mNotification.mMessage.rfind( left_prefix ) == 0;
+        bool is_right = mNotification.mMessage.rfind( right_prefix ) == 0;
 
         if( !is_left && !is_right )
         {
@@ -299,9 +310,9 @@ namespace Screens
             display->DrawBMP( "/right.bmp", screen_rect.x + screen_rect.w - bmp_size, screen_rect.y + ( screen_rect.h - bmp_size ) / 2 );
         }
         // write the text on the left side of the screen.
-        String line1 = is_left ? left_prefix : right_prefix;
-        String line2 = mNotification.mMessage.substring( is_left ? strlen( left_prefix ) : strlen( right_prefix ) );
-        line2.trim();
+        std::string line1 = is_left ? left_prefix : right_prefix;
+        std::string line2 = mNotification.mMessage.substr( is_left ? strlen( left_prefix ) : strlen( right_prefix ) );
+        line2 = trim( line2 );
         // line 1 in 8pt, line 2 in 10pt.
         display->setFont( &JetBrainsMono_Thin8pt7b );
         display->setCursor( 0, top_height + 26 );

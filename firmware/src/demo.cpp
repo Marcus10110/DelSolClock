@@ -4,6 +4,7 @@
 #include "display.h"
 #include "logger.h"
 #include "motion.h"
+#include "utilities.h"
 
 namespace Demo
 {
@@ -16,7 +17,7 @@ namespace Demo
             tft->DrawCanvas( display );
             delay( 10 );
             // print memory usage:
-            LOG_TRACE( "free memory: %d", ESP.getFreeHeap() );
+            PRINT_MEMORY_USAGE();
         }
 
         Motion::HistoryTracker brakeHistoryTracker( Screens::GMeter::HistorySize, 100 );

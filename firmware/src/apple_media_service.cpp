@@ -1,5 +1,6 @@
 #include "apple_media_service.h"
 #include "logger.h"
+#include "utilities.h"
 
 #include <BLEClient.h>
 #include <Arduino.h>
@@ -81,6 +82,8 @@ namespace AppleMediaService
     bool StartMediaService( BLEClient* client )
     {
         assert( client != nullptr );
+        LOG_TRACE( "starting Apple Media Service" );
+        PRINT_MEMORY_USAGE();
 
         if( !client->isConnected() )
         {
@@ -94,23 +97,24 @@ namespace AppleMediaService
             LOG_ERROR( "Apple music service not found" );
             return false;
         }
+        LOG_TRACE( "Apple music service found" );
 
-        // TODO: Add support for actually sending media control commands
-        auto remote_command_characteristic = music_service->getCharacteristic( APPLE_REMOTE_COMMAND_UUID );
-        if( !remote_command_characteristic )
-        {
-            LOG_ERROR( "Apple remote command characteristic not found" );
-            return false;
-        }
+        // // TODO: Add support for actually sending media control commands
+        // auto remote_command_characteristic = music_service->getCharacteristic( APPLE_REMOTE_COMMAND_UUID );
+        // if( !remote_command_characteristic )
+        // {
+        //     LOG_ERROR( "Apple remote command characteristic not found" );
+        //     return false;
+        // }
 
         // TODO: Add support for the entity attribute characteristic, which is only used for handling track attributes that are too long for
         // entity update.
-        auto entity_attribute_characteristic = music_service->getCharacteristic( APPLE_REMOTE_COMMAND_UUID );
-        if( !entity_attribute_characteristic )
-        {
-            LOG_ERROR( "Apple entity attribute characteristic not found" );
-            return false;
-        }
+        // auto entity_attribute_characteristic = music_service->getCharacteristic( APPLE_REMOTE_COMMAND_UUID );
+        // if( !entity_attribute_characteristic )
+        // {
+        //     LOG_ERROR( "Apple entity attribute characteristic not found" );
+        //     return false;
+        // }
 
         auto entity_update = music_service->getCharacteristic( APPLE_ENTITY_UPDATE_UUID );
         if( !entity_update )
@@ -118,6 +122,7 @@ namespace AppleMediaService
             LOG_ERROR( "Apple entity update characteristic not found" );
             return false;
         }
+        LOG_TRACE( "Apple entity update characteristic found" );
 
         entity_update->registerForNotify( []( BLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool is_notify ) {
             bool notify = gNotificationLevel == NotificationLevel::All;
@@ -218,9 +223,12 @@ namespace AppleMediaService
         uint8_t queue_setup[] = { 1, 0, 1, 2, 3 };
         uint8_t track_setup[] = { 2, 0, 1, 2, 3 };
 
+        LOG_TRACE( "write to entity update" );
         entity_update->writeValue( player_setup, sizeof( player_setup ), true );
         entity_update->writeValue( queue_setup, sizeof( queue_setup ), true );
         entity_update->writeValue( track_setup, sizeof( track_setup ), true );
+        LOG_TRACE( "Apple Media Service started" );
+        PRINT_MEMORY_USAGE();
         return true;
     }
 }
