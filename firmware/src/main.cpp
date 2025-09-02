@@ -55,7 +55,7 @@ namespace
 
     Tft::Tft* gTft;
     Display::Display gDisplay;
-    CurrentScreen gCurrentScreen = CurrentScreen::GMeter;
+    CurrentScreen gCurrentScreen = CurrentScreen::Default;
 
     Motion::HistoryTracker BrakeHistoryTracker( Screens::GMeter::HistorySize, 100 );
     Motion::HistoryTracker LateralHistoryTracker( Screens::GMeter::HistorySize, 100 );
