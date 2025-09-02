@@ -20,6 +20,8 @@ public class BleConnectionManager : IDisposable
     private readonly ILogger<BleConnectionManager> _logger;
     private bool _disposed = false;
     private bool _isInitialized = false;
+    private DateTime _lastInitAttempt = DateTime.MinValue;
+    private static readonly TimeSpan InitializationCooldown = TimeSpan.FromSeconds(30);
 
     public bool IsConnected => _connectedDevice?.State == Plugin.BLE.Abstractions.DeviceState.Connected;
     public string? ConnectedDeviceName => _connectedDevice?.Name;
@@ -32,22 +34,59 @@ public class BleConnectionManager : IDisposable
         _logger = logger;
     }
 
-    public async Task<bool> InitializeAsync()
+    public async Task<bool> InitializeAsync(bool forceRetry = false)
     {
-        if( _isInitialized )
+        if( _isInitialized && !forceRetry )
             return true;
+
+        // Implement cooldown to avoid rapid retry attempts
+        if( !forceRetry && DateTime.Now - _lastInitAttempt < InitializationCooldown )
+        {
+            _logger.LogInformation( "BLE initialization attempted too recently, waiting for cooldown" );
+            return false;
+        }
+
+        _lastInitAttempt = DateTime.Now;
 
         try
         {
             _logger.LogInformation( "Initializing BLE connection manager" );
 
-            // Check BLE state
+            // Get the BLE instance
             var ble = CrossBluetoothLE.Current;
+            
+            // Subscribe to state changes first (for iOS permission handling)
+            ble.StateChanged += OnBleStateChanged;
+
+            // Initial state check with more detailed logging
+            _logger.LogInformation( "Initial BLE state: {State}", ble.State );
+            
+            // For iOS, we may need to wait for permission prompt resolution
+            if( ble.State == BluetoothState.Unknown )
+            {
+                _logger.LogInformation( "BLE state is Unknown, waiting for iOS permissions..." );
+                
+                // Wait up to 5 seconds for iOS to resolve permissions
+                var maxWaitTime = TimeSpan.FromSeconds( 5 );
+                var startTime = DateTime.Now;
+                
+                while( ble.State == BluetoothState.Unknown && DateTime.Now - startTime < maxWaitTime )
+                {
+                    await Task.Delay( 500 );
+                    _logger.LogDebug( "Waiting for BLE state resolution... Current state: {State}", ble.State );
+                }
+                
+                _logger.LogInformation( "After waiting, BLE state is: {State}", ble.State );
+            }
+
+            // Check final BLE state
             if( ble.State != BluetoothState.On )
             {
-                _logger.LogWarning( "Bluetooth is not enabled. State: {State}", ble.State );
+                _logger.LogWarning( "Bluetooth is not enabled. State: {State}. Please ensure Bluetooth is enabled and permissions are granted.", ble.State );
                 return false;
             }
+            
+            _logger.LogInformation( "Bluetooth is enabled and ready" );
 
             // Get adapter
             _adapter = ble.Adapter;
@@ -62,9 +101,6 @@ public class BleConnectionManager : IDisposable
             _adapter.DeviceDisconnected += OnDeviceDisconnected;
             _adapter.DeviceConnectionLost += OnDeviceConnectionLost;
 
-            // Subscribe to BLE state changes
-            ble.StateChanged += OnBleStateChanged;
-
             _isInitialized = true;
             _logger.LogInformation( "BLE connection manager initialized successfully" );
             return true;
@@ -74,6 +110,13 @@ public class BleConnectionManager : IDisposable
             _logger.LogError( ex, "Failed to initialize BLE connection manager" );
             return false;
         }
+    }
+
+    public async Task<bool> RetryInitializationAsync()
+    {
+        _logger.LogInformation( "Retrying BLE initialization..." );
+        _isInitialized = false;
+        return await InitializeAsync(forceRetry: true);
     }
 
     public async Task<List<DiscoveredDevice>> ScanForDevicesAsync( Guid serviceId, TimeSpan timeout )

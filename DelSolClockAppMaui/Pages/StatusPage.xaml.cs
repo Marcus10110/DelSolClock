@@ -64,7 +64,23 @@ public partial class StatusPage : ContentPage, INotifyPropertyChanged
             var initialized = await _delSolDevice.InitializeAsync();
             if( !initialized )
             {
-                await DisplayAlert( "Error", "Failed to initialize Bluetooth. Please check your Bluetooth adapter.", "OK" );
+                var retry = await DisplayAlert( "Bluetooth Error", 
+                    "Failed to initialize Bluetooth. This may be due to permission issues on iOS. Would you like to retry?", 
+                    "Retry", "Cancel" );
+                
+                if( retry )
+                {
+                    var retryResult = await _delSolDevice.RetryBluetoothInitializationAsync();
+                    if( !retryResult )
+                    {
+                        await DisplayAlert( "Error", 
+                            "Bluetooth initialization failed again. Please:\n\n" +
+                            "• Ensure Bluetooth is enabled\n" +
+                            "• Check app permissions in Settings\n" +
+                            "• Try restarting the app", 
+                            "OK" );
+                    }
+                }
             }
         }
         catch( Exception ex )

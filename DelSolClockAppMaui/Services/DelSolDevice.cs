@@ -84,6 +84,29 @@ public class DelSolDevice : IDisposable
         }
     }
 
+    public async Task<bool> RetryBluetoothInitializationAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Retrying Bluetooth initialization...");
+            
+            if (_connectionManager != null)
+            {
+                return await _connectionManager.RetryInitializationAsync();
+            }
+            else
+            {
+                // If connection manager is null, try full initialization
+                return await InitializeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Bluetooth initialization retry");
+            return false;
+        }
+    }
+
     public async Task<List<DiscoveredDevice>> ScanForDevicesAsync( TimeSpan timeout = default )
     {
         if( _connectionManager == null || !_isInitialized )
