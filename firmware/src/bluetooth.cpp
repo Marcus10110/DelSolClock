@@ -262,8 +262,6 @@ namespace Bluetooth
                 time.Dump();
             }
 
-// Apple Notification Service disabled, not used.
-#if 1
             esp_task_wdt_reset();
             if( !AppleNotifications::StartNotificationService( Client ) )
             {
@@ -274,8 +272,6 @@ namespace Bluetooth
             {
                 LOG_TRACE( "Notification service started" );
             }
-
-#endif
 
             LOG_TRACE( "HandleConnection finished" );
             PRINT_MEMORY_USAGE();

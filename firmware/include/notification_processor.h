@@ -20,4 +20,5 @@ namespace NotificationProcessor
 
     bool GetLatestNotification( AppleNotifications::NotificationSummary& notification );
     bool GetLatestNavigationNotification( AppleNotifications::NotificationSummary& notification );
+    int GetNotificationCount();
 }

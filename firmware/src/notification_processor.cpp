@@ -32,23 +32,23 @@ namespace NotificationProcessor
         std::map<uint32_t, AppleNotifications::NotificationSummary> OpenNotifications;
         std::deque<uint32_t> Inbox;
 
-        constexpr double MaxNotificationAgeSeconds = 2 * 60 * 60;
         constexpr uint32_t RequestTimeoutMs = 10 * 1000;
 
-        bool ShouldKeepNotification( const AppleNotifications::NotificationSummary& summary )
-        {
-            if( !summary.mDateTime.has_value() )
-            {
-                return false;
-            }
 
-            // check if it's less than MaxNotificationAgeSeconds
-            double age_seconds = difftime( time( nullptr ), summary.mDateTime.value() );
-            if( age_seconds > MaxNotificationAgeSeconds )
+        void TrimOldNotifications()
+        {
+            // lock held by caller.
+            while( OpenNotifications.size() > 10 )
             {
-                return false;
+                auto oldest = std::min_element( OpenNotifications.begin(), OpenNotifications.end(), []( const auto& lhs, const auto& rhs ) {
+                    return difftime( lhs.second.mDateTime.value(), rhs.second.mDateTime.value() ) < 0;
+                } );
+                if( oldest != OpenNotifications.end() )
+                {
+                    LOG_INFO( "Trimming old notification %u [%s]", oldest->first, oldest->second.mDateString.value().c_str() );
+                    OpenNotifications.erase( oldest );
+                }
             }
-            return true;
         }
 
         int RequestAttributes( uint32_t uid )
@@ -158,15 +158,16 @@ namespace NotificationProcessor
 
                             LOG_TRACE( "task completed notification %u", parsed_attribute.mNotificationUID );
 
-                            if( !ShouldKeepNotification( summary ) )
+                            if( !summary.mDateTime.has_value() )
                             {
-                                LOG_TRACE( "task deleting notification %u due to age", parsed_attribute.mNotificationUID );
+                                LOG_TRACE( "task deleting notification %u due to missing date/time", parsed_attribute.mNotificationUID );
                                 OpenNotifications.erase( parsed_attribute.mNotificationUID );
                             }
                             else
                             {
                                 summary.Dump();
                                 summary.mReceivedTime = millis();
+                                TrimOldNotifications();
                             }
                         }
                     }
@@ -229,11 +230,6 @@ namespace NotificationProcessor
                             if( it->second.mDeleteAfterTime != 0 && millis() > it->second.mDeleteAfterTime )
                             {
                                 LOG_TRACE( "deleted later %u", it->first );
-                                it = OpenNotifications.erase( it );
-                            }
-                            else if( !ShouldKeepNotification( it->second ) )
-                            {
-                                LOG_TRACE( "deleted due to age %u", it->first );
                                 it = OpenNotifications.erase( it );
                             }
                             else
@@ -370,5 +366,11 @@ namespace NotificationProcessor
         }
         notification = *latest;
         return true;
+    }
+
+    int GetNotificationCount()
+    {
+        std::scoped_lock lock( OpenNotificationsMutex );
+        return OpenNotifications.size();
     }
 }

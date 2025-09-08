@@ -87,6 +87,7 @@ namespace Screens
       public:
         bool mHasNotification;
         Detail::DisplayNotification mNotification;
+        int mNotificationCount;
         void Draw( Display::Display* display ) override;
     };
 

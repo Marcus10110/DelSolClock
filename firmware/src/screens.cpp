@@ -254,6 +254,12 @@ namespace Screens
 
         display->setFont( &JetBrainsMono_Thin7pt7b );
         display->WriteAligned( summary.c_str(), Display::HorizontalAlignment::Center, Display::VerticalAlignment::Center );
+
+        // write count of notifications in bottom right
+        display->setFont( &JetBrainsMono_Thin7pt7b );
+        char buffer[ 8 ];
+        snprintf( buffer, sizeof( buffer ), "%d", mNotificationCount );
+        display->WriteAligned( buffer, Display::HorizontalAlignment::Right, Display::VerticalAlignment::Bottom );
     }
 
     void Navigation::Draw( Display::Display* display )

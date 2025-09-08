@@ -343,7 +343,6 @@ void loop()
     }
     else if( gCurrentScreen == CurrentScreen::Notifications )
     {
-#if 1
         Screens::Notifications notifications;
         AppleNotifications::NotificationSummary latest_notification;
         notifications.mHasNotification = NotificationProcessor::GetLatestNotification( latest_notification );
@@ -351,9 +350,9 @@ void loop()
         notifications.mNotification.mTitle = latest_notification.mTitle.value_or( "--" );
         notifications.mNotification.mMessage = latest_notification.mMessage.value_or( "--" );
         notifications.mNotification.mSubtitle = latest_notification.mSubtitle.value_or( "--" );
+        notifications.mNotificationCount = NotificationProcessor::GetNotificationCount();
         notifications.Draw( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
-#endif
     }
     else if( gCurrentScreen == CurrentScreen::Navigation )
     {
