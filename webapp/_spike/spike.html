@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Del Sol Clock — Web Bluetooth Spike</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 16px;
+      font: 16px/1.5 -apple-system, system-ui, sans-serif;
+      background: #0f1115; color: #e6e8eb;
+      max-width: 620px; margin-inline: auto;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: #8b919a; font-size: 13px; margin: 0 0 16px; }
+    button {
+      font: inherit; font-weight: 600;
+      background: #2b6cff; color: #fff; border: 0;
+      border-radius: 10px; padding: 12px 16px; width: 100%;
+      margin-bottom: 8px; cursor: pointer;
+    }
+    button:disabled { background: #3a3f47; color: #8b919a; }
+    button.secondary { background: #2a2f37; }
+    .card {
+      background: #171a20; border: 1px solid #232831;
+      border-radius: 12px; padding: 14px; margin-bottom: 12px;
+    }
+    .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+      color: #8b919a; margin: 0 0 10px; }
+    .row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .row .k { color: #8b919a; }
+    .row .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .v.on  { color: #4ade80; }
+    .v.off { color: #f87171; }
+    #log {
+      font: 12px/1.45 ui-monospace, Menlo, monospace;
+      background: #0a0c10; border: 1px solid #232831; border-radius: 10px;
+      padding: 10px; height: 230px; overflow-y: auto; white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log-ok   { color: #4ade80; }
+    .log-err  { color: #f87171; }
+    .log-info { color: #8b919a; }
+    .log-rx   { color: #60a5fa; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; }
+    .pill.warn { background:#3a2c12; color:#f5b955; }
+  </style>
+</head>
+<body>
+  <h1>Del Sol Clock — Web Bluetooth Spike</h1>
+  <p class="sub">
+    Phase 0 feasibility test. Open this in <strong>Bluefy</strong> on iPhone (served over HTTPS),
+    tap Connect, and confirm: (1) the device appears, (2) iOS shows a pairing prompt — enter
+    <strong>123456</strong>, (3) the firmware version reads, (4) status &amp; battery stream live.
+  </p>
+
+  <button id="connect">Connect to “Del Sol”</button>
+  <button id="disconnect" class="secondary" disabled>Disconnect</button>
+
+  <div class="card">
+    <h2>Connection</h2>
+    <div class="row"><span class="k">Web Bluetooth available</span><span class="v" id="avail">checking…</span></div>
+    <div class="row"><span class="k">State</span><span class="v" id="state">Disconnected</span></div>
+    <div class="row"><span class="k">Device</span><span class="v" id="devname">—</span></div>
+    <div class="row"><span class="k">Firmware version</span><span class="v" id="fw">—</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Vehicle Status</h2>
+    <div class="row"><span class="k">Rear Window</span><span class="v" id="s-rw">--</span></div>
+    <div class="row"><span class="k">Trunk</span><span class="v" id="s-trunk">--</span></div>
+    <div class="row"><span class="k">Roof</span><span class="v" id="s-roof">--</span></div>
+    <div class="row"><span class="k">Ignition</span><span class="v" id="s-ign">--</span></div>
+    <div class="row"><span class="k">Head Lights</span><span class="v" id="s-lights">--</span></div>
+    <div class="row"><span class="k">Battery</span><span class="v" id="s-batt">--</span></div>
+    <div class="row"><span class="k">Last update</span><span class="v" id="s-time">--</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // ---- BLE contract (from firmware + MAUI app) ----
+    const SVC_VEHICLE   = '8fb88487-73cf-4cce-b495-505a4b54b802';
+    const CHR_STATUS    = '40d527f5-3204-44a2-a4ee-d8d3c16f970e'; // R/N  CSV "rw,trunk,roof,ign,lights"
+    const CHR_BATTERY   = '5c258bb8-91fc-43bb-8944-b83d0edc9b43'; // R/N  float32 LE volts
+    const SVC_FIRMWARE  = '69da0f2b-43a4-4c2a-b01d-0f11564c732b';
+    const CHR_FW_VER    = 'a5c0d67a-9576-47ea-85c6-0347f8473cf3'; // R    ASCII version
+    const SVC_DEBUG     = '2b0caa53-e543-4bb0-8f7f-50d1c64aa0dd'; // declared so it's usable later
+
+    const $ = (id) => document.getElementById(id);
+    const dec = new TextDecoder();
+
+    function log(msg, cls = 'log-info') {
+      const el = $('log');
+      const line = document.createElement('div');
+      line.className = cls;
+      line.textContent = msg;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    let device = null;
+    let server = null;
+
+    function setState(s) { $('state').textContent = s; }
+
+    function setFlag(id, val) {
+      const el = $(id);
+      el.textContent = val ? 'Yes' : 'No';
+      el.className = 'v ' + (val ? 'on' : 'off');
+    }
+
+    // Status char: ASCII CSV of 5 ints "rw,trunk,roof,ign,lights"
+    function parseStatus(dataview) {
+      const text = dec.decode(dataview).trim();
+      log('RX status: "' + text + '"', 'log-rx');
+      const parts = text.split(',');
+      if (parts.length !== 5) { log('  ! expected 5 fields, got ' + parts.length, 'log-err'); return; }
+      const [rw, trunk, roof, ign, lights] = parts.map(p => parseInt(p, 10) !== 0);
+      setFlag('s-rw', rw); setFlag('s-trunk', trunk); setFlag('s-roof', roof);
+      setFlag('s-ign', ign); setFlag('s-lights', lights);
+      $('s-time').textContent = new Date().toLocaleTimeString();
+    }
+
+    // Battery char: 4-byte little-endian float32 (volts)
+    function parseBattery(dataview) {
+      if (dataview.byteLength !== 4) { log('  ! battery len ' + dataview.byteLength, 'log-err'); return; }
+      const volts = dataview.getFloat32(0, /*littleEndian=*/true);
+      log('RX battery: ' + volts.toFixed(2) + ' V', 'log-rx');
+      $('s-batt').textContent = volts.toFixed(2) + ' V';
+      $('s-time').textContent = new Date().toLocaleTimeString();
+    }
+
+    async function connect() {
+      try {
+        $('connect').disabled = true;
+        setState('Requesting device…');
+        log('requestDevice({ name: "Del Sol" })…');
+
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'Del Sol' }],
+          optionalServices: [SVC_VEHICLE, SVC_FIRMWARE, SVC_DEBUG],
+        });
+
+        $('devname').textContent = device.name || device.id;
+        log('Selected: ' + (device.name || device.id), 'log-ok');
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+
+        setState('Connecting…');
+        log('gatt.connect()…  (iOS pairing prompt may appear — enter 123456)');
+        server = await device.gatt.connect();
+        log('GATT connected.', 'log-ok');
+
+        // Read firmware version — this is an ENCRYPTED characteristic.
+        // If Bluefy/iOS handles the encrypted link, this read succeeds (after pairing).
+        // This is THE make-or-break test for the whole project.
+        setState('Reading firmware version (encrypted)…');
+        const fwSvc = await server.getPrimaryService(SVC_FIRMWARE);
+        const fwChr = await fwSvc.getCharacteristic(CHR_FW_VER);
+        const fwVal = await fwChr.readValue();
+        const fwStr = dec.decode(fwVal).trim();
+        $('fw').textContent = fwStr;
+        log('✅ Encrypted read OK. Firmware: "' + fwStr + '"', 'log-ok');
+
+        // Vehicle service: subscribe to status + battery notifications
+        setState('Subscribing…');
+        const vSvc = await server.getPrimaryService(SVC_VEHICLE);
+
+        const statusChr = await vSvc.getCharacteristic(CHR_STATUS);
+        statusChr.addEventListener('characteristicvaluechanged', (e) => parseStatus(e.target.value));
+        await statusChr.startNotifications();
+        parseStatus(await statusChr.readValue()); // prime with current value
+        log('Subscribed to status notifications.', 'log-ok');
+
+        const battChr = await vSvc.getCharacteristic(CHR_BATTERY);
+        battChr.addEventListener('characteristicvaluechanged', (e) => parseBattery(e.target.value));
+        await battChr.startNotifications();
+        parseBattery(await battChr.readValue());
+        log('Subscribed to battery notifications.', 'log-ok');
+
+        setState('Connected ✅');
+        $('disconnect').disabled = false;
+        log('🎉 SPIKE PASSED — encrypted link + notifications work in this browser.', 'log-ok');
+      } catch (err) {
+        setState('Error');
+        log('❌ ' + (err && err.message ? err.message : String(err)), 'log-err');
+        log('If this is a security/GATT error on the firmware-version read, the encrypted-link path needs work.', 'log-err');
+        $('connect').disabled = false;
+      }
+    }
+
+    function onDisconnected() {
+      setState('Disconnected');
+      $('connect').disabled = false;
+      $('disconnect').disabled = true;
+      log('Device disconnected.', 'log-info');
+    }
+
+    function disconnect() {
+      if (device && device.gatt && device.gatt.connected) {
+        log('Disconnecting…');
+        device.gatt.disconnect();
+      }
+    }
+
+    // ---- init ----
+    (async () => {
+      if (!('bluetooth' in navigator)) {
+        $('avail').textContent = 'NO — not Web Bluetooth capable';
+        $('avail').className = 'v off';
+        log('navigator.bluetooth is undefined. Use Bluefy (iOS) or Chrome/Edge (desktop/Android).', 'log-err');
+        $('connect').disabled = true;
+        return;
+      }
+      $('avail').textContent = 'Yes';
+      $('avail').className = 'v on';
+      try {
+        const ok = await navigator.bluetooth.getAvailability();
+        log('getAvailability(): ' + ok, ok ? 'log-ok' : 'log-err');
+      } catch (e) { log('getAvailability() threw: ' + e.message, 'log-info'); }
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        log('⚠ Not on HTTPS/localhost — Web Bluetooth requires a secure context.', 'log-err');
+      }
+    })();
+
+    $('connect').addEventListener('click', connect);
+    $('disconnect').addEventListener('click', disconnect);
+  </script>
+</body>
+</html>

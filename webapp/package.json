@@ -1,0 +1,19 @@
+{
+  "name": "delsol-webapp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Web Bluetooth companion app for the Del Sol Clock (runs in Bluefy on iOS / Chrome on desktop & Android)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host --port 3000",
+    "typecheck": "tsc --noEmit",
+    "serve": "node tools/serve.mjs"
+  },
+  "devDependencies": {
+    "@types/web-bluetooth": "^0.0.20",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3"
+  }
+}

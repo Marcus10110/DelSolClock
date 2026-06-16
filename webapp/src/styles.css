@@ -1,0 +1,337 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --card: #171a20;
+  --card-border: #232831;
+  --text: #e6e8eb;
+  --muted: #8b919a;
+  --accent: #2b6cff;
+  --accent-2: #2a2f37;
+  --on: #4ade80;
+  --off: #f87171;
+  --gold: #f5b955;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+#app {
+  max-width: 620px;
+  margin-inline: auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px
+    max(16px, env(safe-area-inset-bottom));
+}
+
+header.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+header.app-header .logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffd98a, var(--gold) 70%);
+  flex: none;
+}
+header.app-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  width: 100%;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+button:active {
+  opacity: 0.85;
+}
+button.secondary {
+  background: var(--accent-2);
+}
+button:disabled {
+  background: #3a3f47;
+  color: var(--muted);
+  cursor: default;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.card h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+}
+.row .k {
+  color: var(--muted);
+}
+.row .v {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.v.on {
+  color: var(--on);
+}
+.v.off {
+  color: var(--off);
+}
+.v.muted {
+  color: var(--muted);
+}
+
+/* connection state dot */
+.state-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--off);
+  flex: none;
+}
+.dot.connected {
+  background: var(--on);
+}
+.dot.connecting,
+.dot.requesting {
+  background: var(--gold);
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+  vertical-align: -3px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hidden {
+  display: none !important;
+}
+
+.banner {
+  background: #3a2c12;
+  color: var(--gold);
+  border: 1px solid #5a4318;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.banner a {
+  color: var(--gold);
+}
+
+#log {
+  font: 12px/1.45 ui-monospace, Menlo, monospace;
+  background: #0a0c10;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px;
+  height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.log-ok {
+  color: var(--on);
+}
+.log-error {
+  color: var(--off);
+}
+.log-info {
+  color: var(--muted);
+}
+.log-rx {
+  color: #60a5fa;
+}
+
+/* ---- firmware panel ---- */
+.muted-text {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+.fw-release {
+  border-top: 1px solid var(--card-border);
+  padding: 12px 0;
+}
+.fw-release:first-child {
+  border-top: 0;
+}
+.fw-release-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.fw-release-name {
+  font-weight: 600;
+}
+.fw-release-meta {
+  margin: 2px 0 0;
+}
+.fw-release .fw-update {
+  width: auto;
+  flex: none;
+  padding: 8px 14px;
+  margin: 0;
+}
+.fw-notes {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.fw-notes summary {
+  cursor: pointer;
+}
+.fw-notes pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #0a0c10;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 6px 0 0;
+}
+.fw-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.fw-error {
+  color: var(--off);
+}
+.fw-ok {
+  color: var(--on);
+}
+
+.fw-progress-wrap {
+  padding: 6px 0 4px;
+}
+.fw-progress-msg {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.fw-bar {
+  height: 10px;
+  background: #0a0c10;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.fw-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+  width: 0;
+  transition: width 0.2s ease;
+}
+.fw-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ---- debug panel ---- */
+.dbg-nocrash {
+  color: var(--on);
+  font-size: 14px;
+  margin: 10px 0 0;
+}
+.dbg-crash {
+  margin-top: 10px;
+}
+.dbg-crash-msg {
+  color: var(--gold);
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.dbg-crash-actions {
+  display: flex;
+  gap: 8px;
+}
+.dbg-crash-actions button {
+  width: auto;
+  flex: 1;
+  margin: 0;
+}
+.dbg-controls {
+  margin-top: 16px;
+  border-top: 1px solid var(--card-border);
+  padding-top: 12px;
+}
+.dbg-controls-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.dbg-btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dbg-btn-grid button {
+  margin: 0;
+}
+.dbg-danger {
+  background: #4a1f24;
+  color: #ffb4b4;
+}
+.dbg-danger:active {
+  opacity: 0.85;
+}

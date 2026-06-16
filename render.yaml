@@ -1,0 +1,59 @@
+# Render Blueprint for the Del Sol Clock web app.
+# https://render.com/docs/blueprint-spec
+#
+# Deploys webapp/ as a free static site. Custom domain (delsol.markgarrison.io)
+# and managed HTTPS are configured in the Render dashboard after the first deploy
+# (see DEPLOY.md). HTTPS is required for Web Bluetooth, and Render provisions it
+# automatically for custom domains.
+services:
+  - type: web
+    runtime: static
+    name: delsol-clock
+    # Build from the webapp subdirectory of the repo.
+    rootDir: webapp
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    # Auto-deploy on push to the default branch.
+    autoDeployTrigger: commit
+
+    headers:
+      # Authoritative CSP (the index.html <meta> tag is a fallback). Keep these
+      # two in sync with the CSP in vite.config.ts.
+      - path: /*
+        name: Content-Security-Policy
+        value: >-
+          default-src 'self';
+          script-src 'self';
+          style-src 'self' 'unsafe-inline';
+          img-src 'self' data:;
+          font-src 'self';
+          manifest-src 'self';
+          worker-src 'self';
+          connect-src 'self' https://api.github.com https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
+          base-uri 'self';
+          form-action 'self';
+          frame-ancestors 'none';
+          upgrade-insecure-requests
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Permissions-Policy
+        # Allow this origin to use Web Bluetooth; deny other powerful features.
+        value: "bluetooth=(self), camera=(), microphone=(), geolocation=()"
+      - path: /*
+        name: Strict-Transport-Security
+        value: "max-age=31536000; includeSubDomains"
+
+    routes:
+      # SPA fallback: serve index.html for unknown paths (single-page app).
+      # Real asset files are served directly; this only catches client routes.
+      - type: rewrite
+        source: /*
+        destination: /index.html
