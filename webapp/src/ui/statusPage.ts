@@ -158,7 +158,9 @@ export class StatusPage {
     banner.classList.remove('hidden');
     banner.innerHTML =
       'Web Bluetooth isn’t available in this browser. On iPhone, open this page in ' +
-      '<strong>Bluefy</strong>. On desktop/Android use Chrome or Edge.';
+      '<a href="https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055" ' +
+      'target="_blank" rel="noopener noreferrer"><strong>Bluefy</strong></a>. ' +
+      'On desktop/Android use Chrome or Edge.';
     this.connectBtn.disabled = true;
   }
 
