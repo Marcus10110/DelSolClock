@@ -1,6 +1,10 @@
 # Font Conversion Tool
 
-The Adafruit GFX Library uses its own font format, and provides a tool for converting fonts to this format. This directory contains a bash script that automates the entire process of converting TTF and OTF fonts to Adafruit GFX headers.
+The Adafruit GFX Library uses its own font format, and provides a tool for converting fonts to this format. This directory automates converting the TTF/OTF fonts in `input/` into Adafruit GFX headers in `output/`.
+
+`go.sh` installs dependencies and runs `convert_fonts.py`, which (beyond the raw
+headers) also generates a `Fonts::` namespace with an `enum class Font` and a
+`GetFont(Font, int size)` lookup — see `instructions.md` for that design.
 
 ## Prerequisites
 
@@ -12,24 +16,16 @@ The Adafruit GFX Library uses its own font format, and provides a tool for conve
 ## Usage
 
 ```bash
-./convert.sh --input <input_directory> --output <output_directory> [--reset]
+./go.sh
 ```
 
-### Arguments
+This converts every font in `input/` and writes the headers to `output/`
+(both paths are fixed). To add a font, drop a `.ttf` or `.otf` into `input/`
+and re-run `./go.sh`.
 
-- `--input`: Directory containing your TTF and/or OTF font files
-- `--output`: Directory where generated header files will be written (created if it doesn't exist)
-- `--reset`: (Optional) Remove all existing `*.h` files from output directory before processing
-
-### Examples
-
-```bash
-# Convert fonts from input/ to output/
-./convert.sh --input ./input --output ./output
-
-# Clean output directory first, then convert
-./convert.sh --input ./fonts --output ./headers --reset
-```
+> Note: `input/` (source fonts) is committed; `output/` and `_deps/` are
+> generated and gitignored. The firmware keeps its own copy of the fonts it
+> actually uses in `firmware/include/fonts/`.
 
 ## What it does
 
@@ -46,7 +42,9 @@ The Adafruit GFX Library uses its own font format, and provides a tool for conve
    - Generates headers for font sizes: 7, 8, 9, 10, 12, 14, 16 points
    - Output files named as: `<FontName><Size>pt7b.h`
    - Cleans up temporary converted files
-4. **Master Header**: Creates `all_fonts.h` with includes for all generated headers
+4. **Master Files**: Creates `all_fonts.h` (font includes, `enum class Font`,
+   and the `GetFont` declaration) and `all_fonts.cpp` (the `GetFont`
+   implementation), both in the `Fonts::` namespace
 
 ## Output Structure
 
@@ -60,7 +58,8 @@ output/
 ├── MyFont12pt7b.h
 ├── MyFont14pt7b.h
 ├── MyFont16pt7b.h
-└── all_fonts.h
+├── all_fonts.h
+└── all_fonts.cpp
 ```
 
 ## Performance
@@ -83,11 +82,15 @@ All cached files are preserved between runs for optimal performance.
 
 ## Integration
 
-Include the generated headers in your Arduino/C++ project:
+Include the generated header (and compile `all_fonts.cpp`) in your Arduino/C++
+project:
 
 ```cpp
 #include "all_fonts.h"
 
-// Use fonts like:
+// Look up a font by enum + size:
+display.setFont(Fonts::GetFont(Fonts::Font::JetBrainsMono, 12));
+
+// Or reference a specific generated font directly:
 display.setFont(&MyFont12pt7b);
 ```
