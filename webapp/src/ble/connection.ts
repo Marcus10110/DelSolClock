@@ -93,33 +93,109 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     try {
       this.setState('requesting');
       this.log('info', `Requesting device "${ADVERTISED_NAME}"…`);
-      this.device = await navigator.bluetooth.requestDevice({
+      const device = await navigator.bluetooth.requestDevice({
         filters: [{ name: ADVERTISED_NAME }],
         optionalServices: ALL_SERVICES,
       });
-      this.log('ok', `Selected: ${this.device.name ?? this.device.id}`);
-      this.device.addEventListener('gattserverdisconnected', this.onDisconnected);
-
-      this.setState('connecting');
-      this.log('info', 'Connecting to GATT server…');
-      const gatt = this.device.gatt;
-      if (!gatt) throw new Error('Device has no GATT server.');
-      this.server = await gatt.connect();
-      this.log('ok', 'GATT connected.');
-
-      await this.readFirmwareVersion();
-      await this.subscribeVehicle();
-
-      this.setState('connected');
-      this.log('ok', 'Connected.');
+      this.log('ok', `Selected: ${device.name ?? device.id}`);
+      await this.establishConnection(device);
     } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      this.log('error', error.message);
-      this.emit('error', error);
-      this.cleanup();
-      this.setState('disconnected');
-      throw error;
+      this.fail(err);
+      throw err instanceof Error ? err : new Error(String(err));
     }
+  }
+
+  /**
+   * Devices the user has previously granted access to (via getDevices()), so we
+   * can reconnect without the picker. Returns [] if the browser doesn't support
+   * getDevices() — notably Bluefy on iOS, where the picker is always required.
+   */
+  static async getKnownDevices(): Promise<BluetoothDevice[]> {
+    if (!DelSolConnection.isSupported() || !navigator.bluetooth.getDevices) {
+      return [];
+    }
+    try {
+      const devices = await navigator.bluetooth.getDevices();
+      // Only our clock (the picker may have granted others in other sessions).
+      return devices.filter((d) => d.name === ADVERTISED_NAME);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Reconnect to a previously-granted device without showing the picker.
+   * Waits for an advertisement first (so the device is in range) to avoid the
+   * "out of range" error you get connecting to a stale getDevices() handle.
+   */
+  async reconnect(device: BluetoothDevice): Promise<void> {
+    if (!DelSolConnection.isSupported()) {
+      throw new Error('Web Bluetooth is not available in this browser.');
+    }
+    try {
+      this.setState('connecting');
+      this.log('info', `Reconnecting to "${device.name ?? device.id}"…`);
+      await this.waitForInRange(device);
+      await this.establishConnection(device);
+    } catch (err) {
+      this.fail(err);
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  /**
+   * Wait until the device advertises (is in range), then stop watching. If
+   * watchAdvertisements isn't supported, fall through and let connect() try
+   * directly. Times out after ~10s.
+   */
+  private async waitForInRange(device: BluetoothDevice): Promise<void> {
+    if (typeof device.watchAdvertisements !== 'function') return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const onAdv = () => {
+          device.removeEventListener('advertisementreceived', onAdv);
+          resolve();
+        };
+        device.addEventListener('advertisementreceived', onAdv);
+        controller.signal.addEventListener('abort', () => {
+          device.removeEventListener('advertisementreceived', onAdv);
+          reject(new Error('Device not found in range (timed out).'));
+        });
+        device.watchAdvertisements({ signal: controller.signal }).catch(reject);
+      });
+    } finally {
+      clearTimeout(timeout);
+      controller.abort();
+    }
+  }
+
+  /** Shared connect path used by both connect() (picker) and reconnect(). */
+  private async establishConnection(device: BluetoothDevice): Promise<void> {
+    this.device = device;
+    this.device.addEventListener('gattserverdisconnected', this.onDisconnected);
+
+    this.setState('connecting');
+    this.log('info', 'Connecting to GATT server…');
+    const gatt = this.device.gatt;
+    if (!gatt) throw new Error('Device has no GATT server.');
+    this.server = await gatt.connect();
+    this.log('ok', 'GATT connected.');
+
+    await this.readFirmwareVersion();
+    await this.subscribeVehicle();
+
+    this.setState('connected');
+    this.log('ok', 'Connected.');
+  }
+
+  private fail(err: unknown): void {
+    const error = err instanceof Error ? err : new Error(String(err));
+    this.log('error', error.message);
+    this.emit('error', error);
+    this.cleanup();
+    this.setState('disconnected');
   }
 
   disconnect(): void {

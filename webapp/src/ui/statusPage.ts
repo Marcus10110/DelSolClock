@@ -24,7 +24,11 @@ export class StatusPage {
   private readonly firmwarePanel = new FirmwarePanel();
   private readonly debugPanel = new DebugPanel();
 
+  // A previously-granted device we can reconnect to without the picker.
+  private knownDevice: BluetoothDevice | null = null;
+
   // cached element refs
+  private reconnectBtn!: HTMLButtonElement;
   private connectBtn!: HTMLButtonElement;
   private demoBtn!: HTMLButtonElement;
   private busyBtn!: HTMLButtonElement;
@@ -52,6 +56,20 @@ export class StatusPage {
     this.wireEvents();
     this.checkSupport();
     this.render('disconnected');
+    void this.loadKnownDevice();
+  }
+
+  /** On load, surface a "Reconnect" button if a device was previously granted. */
+  private async loadKnownDevice(): Promise<void> {
+    const devices = await DelSolConnection.getKnownDevices();
+    if (devices.length === 0) return;
+    this.knownDevice = devices[0];
+    const name = this.knownDevice.name ?? 'Del Sol';
+    this.reconnectBtn.textContent = `Reconnect to ${name}`;
+    // Only show while idle (render() manages busy/connected visibility).
+    if (this.conn === null || !this.conn.isConnected) {
+      this.reconnectBtn.classList.remove('hidden');
+    }
   }
 
   private template(): string {
@@ -63,6 +81,7 @@ export class StatusPage {
 
       <div id="support-banner" class="banner hidden"></div>
 
+      <button id="reconnect" class="hidden">Reconnect</button>
       <button id="connect">Connect to “Del Sol”</button>
       <button id="demo" class="secondary">Demo mode (no device)</button>
       <button id="busy" class="hidden" disabled></button>
@@ -105,6 +124,7 @@ export class StatusPage {
 
   private cacheRefs(): void {
     const q = <T extends HTMLElement>(sel: string) => this.el.querySelector(sel) as T;
+    this.reconnectBtn = q('#reconnect');
     this.connectBtn = q('#connect');
     this.demoBtn = q('#demo');
     this.busyBtn = q('#busy');
@@ -127,6 +147,7 @@ export class StatusPage {
   }
 
   private wireEvents(): void {
+    this.reconnectBtn.addEventListener('click', () => void this.handleReconnect());
     this.connectBtn.addEventListener('click', () => void this.handleConnect());
     this.demoBtn.addEventListener('click', () => void this.handleDemo());
     this.disconnectBtn.addEventListener('click', () => this.conn?.disconnect());
@@ -173,6 +194,18 @@ export class StatusPage {
     }
   }
 
+  private async handleReconnect(): Promise<void> {
+    if (!this.knownDevice) return;
+    const conn = new DelSolConnection();
+    this.useConnection(conn);
+    try {
+      await conn.reconnect(this.knownDevice);
+    } catch {
+      // reconnect failed (out of range / off). Fall back to the picker.
+      this.appendLog('info', 'Reconnect failed — use Connect to pick the device.');
+    }
+  }
+
   private async handleDemo(): Promise<void> {
     this.useConnection(new DemoConnection());
     await this.conn!.connect();
@@ -196,6 +229,11 @@ export class StatusPage {
     this.connectBtn.classList.toggle('hidden', busy || connected);
     this.connectBtn.disabled = !DelSolConnection.isSupported();
     this.demoBtn.classList.toggle('hidden', busy || connected);
+    // Reconnect: only while idle and a previously-granted device is known.
+    // When shown, it's the primary action; demote Connect to a secondary style.
+    const showReconnect = !busy && !connected && this.knownDevice !== null;
+    this.reconnectBtn.classList.toggle('hidden', !showReconnect);
+    this.connectBtn.classList.toggle('secondary', showReconnect);
     this.busyBtn.classList.toggle('hidden', !busy);
     this.busyBtn.innerHTML = `<span class="spinner"></span> ${labels[state]}`;
 
