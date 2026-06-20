@@ -2,3 +2,8 @@ node_modules/
 dist/
 *.local
 .DS_Store
+
+# Secrets: Mapbox token etc. Never commit.
+.env
+.env.*
+!.env.example
