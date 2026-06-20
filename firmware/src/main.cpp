@@ -22,6 +22,8 @@
 #include "motion.h"
 #include "demo.h"
 #include "quarter_mile.h"
+#include "navigation_service.h"
+#include "matcher.h"
 #include "logger.h"
 #include "debug_service.h"
 #include "utilities.h"
@@ -48,7 +50,7 @@ enum class CurrentScreen
 
 
 // define this when targeting a Adafruit Feather board, instead of a Del Sol Clock. Useful for testing BLE.
-// #define DISABLE_SLEEP
+#define DISABLE_SLEEP
 // define this to run the demo mode, which will cycle through all the screens.
 // #define DEMO_MODE
 namespace
@@ -255,6 +257,44 @@ void loop()
     Bluetooth::Service();
     Gps::Service();
     CarIO::Service();
+
+    // Live navigation matcher (Phase 3 test scaffold): when a route has been
+    // downloaded and the GPS has a fresh fix, run the matcher and log the result
+    // + timing. No UI yet — this is for serial-log validation / road testing.
+    if( NavigationService::HasRoute() )
+    {
+        static uint32_t last_match_loc_age_ms = 0xFFFFFFFF;
+        auto* gps = Gps::GetGps();
+        if( gps->location.isValid() && gps->location.age() < 5000 )
+        {
+            // Only re-run when the location has updated since last time (~1Hz).
+            uint32_t age = gps->location.age();
+            if( age < last_match_loc_age_ms )
+            {
+                last_match_loc_age_ms = age;
+                nav::GpsFix fix{ gps->location.lat(), gps->location.lng() };
+                const auto& route = NavigationService::GetRoute();
+                auto t0 = micros();
+                nav::MatchResult m = nav::match( route, fix );
+                auto match_us = micros() - t0;
+                const char* instruction = "";
+                if( m.nextManeuverIndex >= 0 &&
+                    m.nextManeuverIndex < ( int )route.maneuvers.size() )
+                {
+                    instruction = route.maneuvers[ m.nextManeuverIndex ].instruction.c_str();
+                }
+                LOG_INFO( "nav: along=%.0f off=%.1f%s toTurn=%.0f toDest=%.0f match=%uus next=\"%s\"",
+                          m.distanceAlongRouteMeters, m.offRouteDistanceMeters,
+                          m.isOffRoute ? " OFFROUTE" : "",
+                          m.distanceToNextTurnMeters, m.distanceToDestinationMeters,
+                          ( unsigned )match_us, instruction );
+            }
+            else
+            {
+                last_match_loc_age_ms = age;
+            }
+        }
+    }
     auto car_status = CarIO::GetStatus();
     auto button_events = CarIO::GetButtonEvents();
     if( button_events.mHourButtonPressed )

@@ -19,6 +19,7 @@
 #include "apple_notification_center_service.h"
 #include "debug_service.h"
 #include "ble_ota.h"
+#include "navigation_service.h"
 #include "logger.h"
 #include "utilities.h"
 
@@ -322,6 +323,9 @@ namespace Bluetooth
         // Add the OTA service.
         PRINT_MEMORY_USAGE_MSG( "before BleOta Begin" );
         BleOta::Begin( Server );
+
+        // Add the Navigation service (route download).
+        NavigationService::Begin( Server );
 
         auto vechicle_service = Server->createService( DELSOL_VEHICLE_SERVICE_UUID );
         VehicleStatusCharacteristic = vechicle_service->createCharacteristic(

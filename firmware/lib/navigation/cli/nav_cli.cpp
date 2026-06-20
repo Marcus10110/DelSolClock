@@ -11,26 +11,55 @@
 // This binary contains no assertions or synthetic-GPS generation — the TS test
 // harness drives it. It exists only to run the *real* shared matcher on desktop.
 #include <fstream>
+#include <cstdint>
 #include <iostream>
+#include <iterator>
 #include <string>
+#include <vector>
 
 #include "matcher.h"
+#include "route_codec.h"
 #include "route_io.h"
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::cerr << "usage: nav_cli <route-file>\n";
+    std::cerr << "usage: nav_cli [--binary] <route-file>\n";
     return 2;
   }
-  std::ifstream routeFile(argv[1]);
-  if (!routeFile) {
-    std::cerr << "nav_cli: cannot open route file: " << argv[1] << "\n";
-    return 2;
+  bool binary = false;
+  const char* path = argv[1];
+  if (std::string(argv[1]) == "--binary") {
+    if (argc < 3) {
+      std::cerr << "usage: nav_cli --binary <route-file>\n";
+      return 2;
+    }
+    binary = true;
+    path = argv[2];
   }
+
   nav::RouteSummary route;
-  if (!nav::readRoute(routeFile, route)) {
-    std::cerr << "nav_cli: failed to parse route file\n";
-    return 2;
+  if (binary) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) {
+      std::cerr << "nav_cli: cannot open route file: " << path << "\n";
+      return 2;
+    }
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)),
+                               std::istreambuf_iterator<char>());
+    if (!nav::decodeRoute(bytes.data(), bytes.size(), route)) {
+      std::cerr << "nav_cli: failed to decode binary route\n";
+      return 2;
+    }
+  } else {
+    std::ifstream routeFile(path);
+    if (!routeFile) {
+      std::cerr << "nav_cli: cannot open route file: " << path << "\n";
+      return 2;
+    }
+    if (!nav::readRoute(routeFile, route)) {
+      std::cerr << "nav_cli: failed to parse route file\n";
+      return 2;
+    }
   }
 
   std::cout.setf(std::ios::fixed);
