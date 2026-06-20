@@ -8,6 +8,8 @@
 
 #include <Adafruit_GFX.h>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace display {
 
@@ -50,5 +52,16 @@ void GetTextLocation(Adafruit_GFX* gfx, const char* text, HAlign horizontal,
 void WriteAligned(Adafruit_GFX* gfx, const char* text, HAlign horizontal,
                   VAlign vertical, const Rect* within_region = nullptr,
                   Rect* text_region = nullptr);
+
+// Width of `s` in pixels for the given custom GFX font, summing per-glyph
+// xAdvance. Prefer this over Adafruit getTextBounds for layout/fitting — that
+// can under-report custom-font width; this matches how drawChar advances.
+int16_t MeasureWidth(const GFXfont* font, const std::string& s);
+
+// Greedily word-wrap `text` into lines no wider than `maxWidth` (pixels) in the
+// given font. A single word wider than maxWidth is left on its own line (GFX
+// would otherwise break mid-word).
+std::vector<std::string> WrapWords(const GFXfont* font, const std::string& text,
+                                   int16_t maxWidth);
 
 }  // namespace display

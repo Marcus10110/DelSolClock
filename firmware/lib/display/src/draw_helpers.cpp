@@ -72,4 +72,37 @@ void WriteAligned(Adafruit_GFX* gfx, const char* text, HAlign horizontal,
   gfx->write(text);
 }
 
+int16_t MeasureWidth(const GFXfont* font, const std::string& s) {
+  if (!font) return 0;
+  int total = 0;
+  for (char ch : s) {
+    uint8_t c = static_cast<uint8_t>(ch);
+    if (c < font->first || c > font->last) continue;
+    total += font->glyph[c - font->first].xAdvance;
+  }
+  return static_cast<int16_t>(total);
+}
+
+std::vector<std::string> WrapWords(const GFXfont* font, const std::string& text,
+                                   int16_t maxWidth) {
+  std::vector<std::string> lines;
+  std::string line;
+  size_t i = 0;
+  while (i < text.size()) {
+    size_t sp = text.find(' ', i);
+    std::string word = text.substr(i, sp == std::string::npos ? sp : sp - i);
+    std::string candidate = line.empty() ? word : line + " " + word;
+    if (MeasureWidth(font, candidate) <= maxWidth || line.empty()) {
+      line = candidate;
+    } else {
+      lines.push_back(line);
+      line = word;
+    }
+    if (sp == std::string::npos) break;
+    i = sp + 1;
+  }
+  if (!line.empty()) lines.push_back(line);
+  return lines;
+}
+
 }  // namespace display
