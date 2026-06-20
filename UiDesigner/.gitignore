@@ -1,0 +1,8 @@
+/build/
+/.deps/
+/reference/
+/out/
+
+# Throwaway smoke-test renders produced during development.
+*_smoke.bmp
+*_smoke.png
