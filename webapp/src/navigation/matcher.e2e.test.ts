@@ -26,7 +26,7 @@ function offsetMeters(p: LatLng, east: number, north: number): LatLng {
   };
 }
 
-const FIXTURES = ['simple_turn', 'long_route', 'self_crossing'];
+const FIXTURES = ['simple_turn', 'long_route', 'self_crossing', 'daily_commute'];
 
 describe.each(FIXTURES)('matcher e2e: %s', (name) => {
   const route = loadRoute(name);

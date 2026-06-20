@@ -21,7 +21,7 @@ function metersBetween(
   return Math.hypot(dx, dy);
 }
 
-const FIXTURES = ['simple_turn', 'long_route', 'self_crossing'];
+const FIXTURES = ['simple_turn', 'long_route', 'self_crossing', 'daily_commute'];
 
 describe.each(FIXTURES)('buildRouteSummary(%s)', (name) => {
   const raw = loadFixture(name);

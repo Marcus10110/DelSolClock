@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 
 import { routeSummaryToText } from './exportRoute';
+import { encodeRoute } from './routeCodec';
 import type { LatLng, RouteSummary } from './types';
 
 export interface MatchResultRow {
@@ -36,10 +37,16 @@ export function navCliExists(): boolean {
   return existsSync(navCliPath());
 }
 
-/** Run the C++ matcher over a route + a list of GPS fixes. */
+/**
+ * Run the C++ matcher over a route + a list of GPS fixes.
+ * `format` selects how the route is handed to nav_cli: the text route_io format
+ * (default) or the binary wire format (routeCodec) — the latter exercises the
+ * exact bytes that cross BLE, decoded by the real C++ decoder.
+ */
 export function runMatcher(
   route: RouteSummary,
   fixes: LatLng[],
+  format: 'text' | 'binary' = 'text',
 ): MatchResultRow[] {
   const cli = navCliPath();
   if (!existsSync(cli)) {
@@ -52,11 +59,19 @@ export function runMatcher(
   }
 
   const dir = mkdtempSync(join(tmpdir(), 'navcli-'));
-  const routePath = join(dir, 'route.txt');
   try {
-    writeFileSync(routePath, routeSummaryToText(route));
     const stdin = fixes.map((f) => `${f.lat} ${f.lng}`).join('\n') + '\n';
-    const proc = spawnSync(cli, [routePath], { input: stdin, encoding: 'utf8' });
+    let args: string[];
+    if (format === 'binary') {
+      const routePath = join(dir, 'route.bin');
+      writeFileSync(routePath, encodeRoute(route));
+      args = ['--binary', routePath];
+    } else {
+      const routePath = join(dir, 'route.txt');
+      writeFileSync(routePath, routeSummaryToText(route));
+      args = [routePath];
+    }
+    const proc = spawnSync(cli, args, { input: stdin, encoding: 'utf8' });
     if (proc.status !== 0) {
       throw new Error(`nav_cli exited ${proc.status}: ${proc.stderr}`);
     }
