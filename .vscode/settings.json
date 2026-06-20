@@ -85,6 +85,16 @@
         "memory_resource": "cpp"
     },
     "clang-format.executable": "C:\\Users\\markg\\Software\\clang-format-6923b0a7.exe",
-    "arduino.useArduinoCli": true
-    
+    "arduino.useArduinoCli": true,
+
+    "//": "Auto-render UiDesigner screens when shared display code is saved.",
+    "//comment": "Requires the 'emeraldwalk.runonsave' VS Code extension. Open VS Code at the repo root for this to fire on firmware/lib/display edits.",
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": "firmware[\\\\/]lib[\\\\/]display[\\\\/].*\\.(cpp|h)$|UiDesigner[\\\\/]runner[\\\\/].*\\.(cpp|h)$",
+                "cmd": "powershell -ExecutionPolicy Bypass -File \"${workspaceFolder}/UiDesigner/tools/generate_on_save.ps1\""
+            }
+        ]
+    }
 }
