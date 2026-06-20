@@ -67,6 +67,7 @@ add_library(navigation-shared
   ${NAV_LIB}/src/geo.cpp
   ${NAV_LIB}/src/matcher.cpp
   ${NAV_LIB}/src/route_io.cpp
+  ${NAV_LIB}/src/route_codec.cpp
 )
 target_include_directories(navigation-shared PUBLIC ${NAV_LIB}/include)
 target_compile_features(navigation-shared PUBLIC cxx_std_20)
