@@ -1,0 +1,15 @@
+{
+  "name": "navigation",
+  "version": "0.1.0",
+  "description": "Shared Del Sol navigation library: route matcher + geometry. Pure C++/std (no Adafruit GFX). Compiled into both the ESP32 firmware (PlatformIO) and the desktop nav_cli (CMake).",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include",
+    "srcFilter": [
+      "+<*>",
+      "-<../cli/>"
+    ]
+  }
+}
