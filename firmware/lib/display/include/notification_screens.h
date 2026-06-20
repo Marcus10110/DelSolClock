@@ -26,4 +26,17 @@ struct NavigationProps {
 };
 void DrawNavigation(Adafruit_GFX* gfx, const NavigationProps& props);
 
+// Matcher-driven turn-by-turn navigation screen (Phase 4). Renders the next
+// instruction full-width with a large font + distance-to-turn. Independent of
+// the ANCS notification stack — fed by the on-device route matcher.
+struct NavRouteProps {
+  bool hasRoute{false};       // a route has been loaded
+  bool hasFix{false};         // GPS has a valid, fresh fix
+  bool isOffRoute{false};
+  const char* instruction{""};  // next maneuver instruction text
+  double distanceToTurnMeters{0};
+  double offRouteDistanceMeters{0};
+};
+void DrawNavRoute(Adafruit_GFX* gfx, const NavRouteProps& props);
+
 }  // namespace display

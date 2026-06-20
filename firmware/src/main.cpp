@@ -66,6 +66,12 @@ namespace
     GFXcanvas16 gDisplay( display::kWidth, display::kHeight );
     CurrentScreen gCurrentScreen = CurrentScreen::Default;
 
+    // Latest navigation match result, updated by the live matcher when a route is
+    // loaded + GPS is fresh. Consumed by the Navigation screen render.
+    nav::MatchResult gNavResult;
+    bool gNavHasFix = false;        // GPS had a fresh fix at last match
+    std::string gNavInstruction;    // next-maneuver instruction (owns the string)
+
     Motion::HistoryTracker BrakeHistoryTracker( display::GMeterProps::HistorySize, 100 );
     Motion::HistoryTracker LateralHistoryTracker( display::GMeterProps::HistorySize, 100 );
 }
@@ -262,14 +268,15 @@ void loop()
     Gps::Service();
     CarIO::Service();
 
-    // Live navigation matcher (Phase 3 test scaffold): when a route has been
-    // downloaded and the GPS has a fresh fix, run the matcher and log the result
-    // + timing. No UI yet — this is for serial-log validation / road testing.
+    // Live navigation matcher: when a route is loaded and the GPS has a fresh
+    // fix, run the matcher (~1Hz on each new fix), store the result for the
+    // Navigation screen, and log it (+ timing) for road testing.
     if( NavigationService::HasRoute() )
     {
         static uint32_t last_match_loc_age_ms = 0xFFFFFFFF;
         auto* gps = Gps::GetGps();
-        if( gps->location.isValid() && gps->location.age() < 5000 )
+        gNavHasFix = gps->location.isValid() && gps->location.age() < 5000;
+        if( gNavHasFix )
         {
             // Only re-run when the location has updated since last time (~1Hz).
             uint32_t age = gps->location.age();
@@ -279,25 +286,29 @@ void loop()
                 nav::GpsFix fix{ gps->location.lat(), gps->location.lng() };
                 const auto& route = NavigationService::GetRoute();
                 auto t0 = micros();
-                nav::MatchResult m = nav::match( route, fix );
+                gNavResult = nav::match( route, fix );
                 auto match_us = micros() - t0;
-                const char* instruction = "";
-                if( m.nextManeuverIndex >= 0 &&
-                    m.nextManeuverIndex < ( int )route.maneuvers.size() )
+                gNavInstruction.clear();
+                if( gNavResult.nextManeuverIndex >= 0 &&
+                    gNavResult.nextManeuverIndex < ( int )route.maneuvers.size() )
                 {
-                    instruction = route.maneuvers[ m.nextManeuverIndex ].instruction.c_str();
+                    gNavInstruction = route.maneuvers[ gNavResult.nextManeuverIndex ].instruction;
                 }
                 LOG_INFO( "nav: along=%.0f off=%.1f%s toTurn=%.0f toDest=%.0f match=%uus next=\"%s\"",
-                          m.distanceAlongRouteMeters, m.offRouteDistanceMeters,
-                          m.isOffRoute ? " OFFROUTE" : "",
-                          m.distanceToNextTurnMeters, m.distanceToDestinationMeters,
-                          ( unsigned )match_us, instruction );
+                          gNavResult.distanceAlongRouteMeters, gNavResult.offRouteDistanceMeters,
+                          gNavResult.isOffRoute ? " OFFROUTE" : "",
+                          gNavResult.distanceToNextTurnMeters, gNavResult.distanceToDestinationMeters,
+                          ( unsigned )match_us, gNavInstruction.c_str() );
             }
             else
             {
                 last_match_loc_age_ms = age;
             }
         }
+    }
+    else
+    {
+        gNavHasFix = false;
     }
     auto car_status = CarIO::GetStatus();
     auto button_events = CarIO::GetButtonEvents();
@@ -323,16 +334,16 @@ void loop()
         {
             gCurrentScreen = CurrentScreen::Navigation;
         }
+#else
+        else if( gCurrentScreen == CurrentScreen::QM )
+        {
+            gCurrentScreen = CurrentScreen::Navigation;
+        }
+#endif
         else if( gCurrentScreen == CurrentScreen::Navigation )
         {
             gCurrentScreen = CurrentScreen::GMeter;
         }
-#else
-        else if( gCurrentScreen == CurrentScreen::QM )
-        {
-            gCurrentScreen = CurrentScreen::GMeter;
-        }
-#endif
         else if( gCurrentScreen == CurrentScreen::GMeter )
         {
             gCurrentScreen = CurrentScreen::Default;
@@ -418,21 +429,21 @@ void loop()
         display::DrawNotifications( &gDisplay, notifications );
         gTft->DrawCanvas( &gDisplay );
     }
+#endif
     else if( gCurrentScreen == CurrentScreen::Navigation )
     {
-        AppleNotifications::NotificationSummary notification;
-        display::NavigationProps navigation;
-        navigation.hasNotification = NotificationProcessor::GetLatestNavigationNotification( notification );
-        std::string nav_title = notification.mTitle.value_or( "--" );
-        std::string nav_message = notification.mMessage.value_or( "--" );
-        std::string nav_subtitle = notification.mSubtitle.value_or( "--" );
-        navigation.notification.title = nav_title.c_str();
-        navigation.notification.message = nav_message.c_str();
-        navigation.notification.subtitle = nav_subtitle.c_str();
-        display::DrawNavigation( &gDisplay, navigation );
+        // Matcher-driven turn-by-turn screen (flag-independent). Fed by the live
+        // matcher result computed earlier this loop.
+        display::NavRouteProps nav_props;
+        nav_props.hasRoute = NavigationService::HasRoute();
+        nav_props.hasFix = gNavHasFix;
+        nav_props.isOffRoute = gNavResult.isOffRoute;
+        nav_props.instruction = gNavInstruction.c_str();
+        nav_props.distanceToTurnMeters = gNavResult.distanceToNextTurnMeters;
+        nav_props.offRouteDistanceMeters = gNavResult.offRouteDistanceMeters;
+        display::DrawNavRoute( &gDisplay, nav_props );
         gTft->DrawCanvas( &gDisplay );
     }
-#endif
     else if( gCurrentScreen == CurrentScreen::GMeter )
     {
         if( button_events.mMinuteButtonPressed )

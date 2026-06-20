@@ -113,6 +113,43 @@ const std::vector<DemoScreen> g_demo_screens = {
        display::DrawNavigation(g, p);
      }},
 
+    {"NavRoute-Turn",
+     [](Adafruit_GFX* g) {
+       display::NavRouteProps p;
+       p.hasRoute = true;
+       p.hasFix = true;
+       p.distanceToTurnMeters = 480;  // ~0.3 mi
+       p.instruction = "Turn left onto Eucalyptus Dr";
+       display::DrawNavRoute(g, p);
+     }},
+
+    {"NavRoute-Close",
+     [](Adafruit_GFX* g) {
+       display::NavRouteProps p;
+       p.hasRoute = true;
+       p.hasFix = true;
+       p.distanceToTurnMeters = 90;  // feet
+       p.instruction = "Turn right onto Sneath Ln";
+       display::DrawNavRoute(g, p);
+     }},
+
+    {"NavRoute-OffRoute",
+     [](Adafruit_GFX* g) {
+       display::NavRouteProps p;
+       p.hasRoute = true;
+       p.hasFix = true;
+       p.isOffRoute = true;
+       p.offRouteDistanceMeters = 175.4;
+       display::DrawNavRoute(g, p);
+     }},
+
+    {"NavRoute-NoRoute",
+     [](Adafruit_GFX* g) {
+       display::NavRouteProps p;
+       p.hasRoute = false;
+       display::DrawNavRoute(g, p);
+     }},
+
     {"QuarterMile-Start",
      [](Adafruit_GFX* g) { display::quarter_mile::DrawStart(g); }},
 

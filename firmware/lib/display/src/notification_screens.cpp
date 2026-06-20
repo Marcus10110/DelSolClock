@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "draw_helpers.h"
 #include "fonts.h"
@@ -104,6 +105,133 @@ void DrawNavigation(Adafruit_GFX* gfx, const NavigationProps& props) {
 
   gfx->setFont(&JetBrainsMono_Thin10pt7b);
   gfx->write(line2.c_str());
+}
+
+namespace {
+
+// Format a distance for display: feet under ~0.2mi, otherwise miles.
+void formatDistance(double meters, char* out, size_t n) {
+  const double feet = meters * 3.28084;
+  if (feet < 1000.0) {
+    // round to nearest 10 ft for stability
+    int ft = static_cast<int>((feet + 5) / 10) * 10;
+    snprintf(out, n, "%d ft", ft);
+  } else {
+    const double miles = meters / 1609.344;
+    snprintf(out, n, "%.1f mi", miles);
+  }
+}
+
+// Width of `s` in pixels for the given custom GFX font, summing per-glyph
+// xAdvance. (Adafruit getTextBounds can under-report custom-font width; this is
+// reliable and matches how drawChar actually advances the cursor.)
+int16_t measureWidth(const GFXfont* font, const std::string& s) {
+  int total = 0;
+  for (char ch : s) {
+    uint8_t c = static_cast<uint8_t>(ch);
+    if (c < font->first || c > font->last) continue;
+    total += font->glyph[c - font->first].xAdvance;
+  }
+  return static_cast<int16_t>(total);
+}
+
+// Greedily word-wrap `text` to lines no wider than `maxWidth` in the current
+// font. A single word wider than maxWidth is left on its own line (GFX would
+// otherwise break mid-word).
+std::vector<std::string> wrapWords(const GFXfont* font, const std::string& text,
+                                   int16_t maxWidth) {
+  std::vector<std::string> lines;
+  std::string line;
+  size_t i = 0;
+  while (i < text.size()) {
+    size_t sp = text.find(' ', i);
+    std::string word = text.substr(i, sp == std::string::npos ? sp : sp - i);
+    std::string candidate = line.empty() ? word : line + " " + word;
+    if (measureWidth(font, candidate) <= maxWidth || line.empty()) {
+      line = candidate;
+    } else {
+      lines.push_back(line);
+      line = word;
+    }
+    if (sp == std::string::npos) break;
+    i = sp + 1;
+  }
+  if (!line.empty()) lines.push_back(line);
+  return lines;
+}
+
+}  // namespace
+
+void DrawNavRoute(Adafruit_GFX* gfx, const NavRouteProps& props) {
+  Clear(gfx);
+  const Rect screen = ScreenRect();
+
+  if (!props.hasRoute) {
+    gfx->setFont(&JetBrainsMono_Thin12pt7b);
+    WriteAligned(gfx, "No Route", HAlign::Center, VAlign::Center);
+    return;
+  }
+  if (!props.hasFix) {
+    gfx->setFont(&JetBrainsMono_Thin12pt7b);
+    WriteAligned(gfx, "Waiting for GPS", HAlign::Center, VAlign::Center);
+    return;
+  }
+  if (props.isOffRoute) {
+    gfx->setFont(&JetBrainsMono_Thin16pt7b);
+    WriteAligned(gfx, "OFF ROUTE", HAlign::Center, VAlign::Top);
+    char buf[32];
+    formatDistance(props.offRouteDistanceMeters, buf, sizeof(buf));
+    gfx->setFont(&JetBrainsMono_Thin12pt7b);
+    WriteAligned(gfx, buf, HAlign::Center, VAlign::Center);
+    return;
+  }
+
+  // Distance-to-turn, large, near the top.
+  char dist[32];
+  formatDistance(props.distanceToTurnMeters, dist, sizeof(dist));
+  gfx->setFont(&JetBrainsMono_Thin16pt7b);
+  Rect distRegion = screen;
+  distRegion.h = 34;
+  WriteAligned(gfx, dist, HAlign::Center, VAlign::Top, &distRegion);
+
+  // Instruction below, full width. Pick the largest font whose word-wrapped
+  // lines fit the remaining height, then draw them centered.
+  const char* instr =
+      props.instruction && props.instruction[0] ? props.instruction : "Continue";
+  Rect instrRegion = screen;
+  instrRegion.y += distRegion.h + 6;
+  instrRegion.h -= distRegion.h + 6;
+
+  const GFXfont* fonts[] = {
+      &JetBrainsMono_Thin16pt7b, &JetBrainsMono_Thin14pt7b,
+      &JetBrainsMono_Thin12pt7b, &JetBrainsMono_Thin10pt7b,
+      &JetBrainsMono_Thin9pt7b,  &JetBrainsMono_Thin8pt7b,
+      &JetBrainsMono_Thin7pt7b,
+  };
+  const GFXfont* chosen = fonts[6];
+  std::vector<std::string> lines;
+  for (const GFXfont* f : fonts) {
+    auto candidate = wrapWords(f, instr, instrRegion.w);
+    int16_t lineH = f->yAdvance;
+    bool fitsHeight =
+        static_cast<int16_t>(candidate.size()) * lineH <= instrRegion.h;
+    lines = candidate;  // keep last evaluated as fallback (smallest font)
+    chosen = f;
+    // wrapWords already guarantees each line fits the width (except a single
+    // over-long word, unavoidable); just check the height here.
+    if (fitsHeight) break;
+  }
+
+  gfx->setFont(chosen);
+  gfx->setTextWrap(false);
+  int16_t lineH = chosen->yAdvance;
+  int16_t totalH = static_cast<int16_t>(lines.size()) * lineH;
+  int16_t y = instrRegion.y + (instrRegion.h - totalH) / 2;
+  for (const auto& ln : lines) {
+    Rect lineRegion{instrRegion.x, y, instrRegion.w, lineH};
+    WriteAligned(gfx, ln.c_str(), HAlign::Center, VAlign::Top, &lineRegion);
+    y += lineH;
+  }
 }
 
 }  // namespace display
