@@ -2,8 +2,10 @@
 
 #include <Arduino.h>
 #include "apple_media_service.h"
+#if ENABLE_APPLE_NOTIFICATIONS
 #include "apple_notification_center_service.h"
 #include "notification_processor.h"
+#endif
 #include "current_time_service.h"
 #include "apple_media_service.h"
 #include "tft.h"
@@ -102,7 +104,9 @@ void setup()
             display::PreloadImage( image );
         }
     }
+#if ENABLE_APPLE_NOTIFICATIONS
     NotificationProcessor::Init();
+#endif
 
     {
         // write the splash screen to the display buffer before starting BLE. this uses a huge amount of RAM temporarily.
@@ -310,6 +314,7 @@ void loop()
             gCurrentScreen = CurrentScreen::QM;
             QuarterMile::Reset();
         }
+#if ENABLE_APPLE_NOTIFICATIONS
         else if( gCurrentScreen == CurrentScreen::QM )
         {
             gCurrentScreen = CurrentScreen::Notifications;
@@ -322,6 +327,12 @@ void loop()
         {
             gCurrentScreen = CurrentScreen::GMeter;
         }
+#else
+        else if( gCurrentScreen == CurrentScreen::QM )
+        {
+            gCurrentScreen = CurrentScreen::GMeter;
+        }
+#endif
         else if( gCurrentScreen == CurrentScreen::GMeter )
         {
             gCurrentScreen = CurrentScreen::Default;
@@ -391,6 +402,7 @@ void loop()
     {
         QuarterMile::Service( &gDisplay, gTft, button_events, Gps::GetGps() );
     }
+#if ENABLE_APPLE_NOTIFICATIONS
     else if( gCurrentScreen == CurrentScreen::Notifications )
     {
         AppleNotifications::NotificationSummary latest_notification;
@@ -420,6 +432,7 @@ void loop()
         display::DrawNavigation( &gDisplay, navigation );
         gTft->DrawCanvas( &gDisplay );
     }
+#endif
     else if( gCurrentScreen == CurrentScreen::GMeter )
     {
         if( button_events.mMinuteButtonPressed )

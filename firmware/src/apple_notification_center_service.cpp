@@ -1,3 +1,7 @@
+// Entire ANCS (Apple Notification Center Service) implementation is compiled out
+// when ENABLE_APPLE_NOTIFICATIONS is 0 (default). See platformio.ini.
+#if ENABLE_APPLE_NOTIFICATIONS
+
 #include "apple_notification_center_service.h"
 #include "logger.h"
 
@@ -146,3 +150,5 @@ namespace AppleNotifications
         return true;
     }
 }
+
+#endif  // ENABLE_APPLE_NOTIFICATIONS

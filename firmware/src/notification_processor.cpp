@@ -1,3 +1,7 @@
+// Compiled out (incl. the FreeRTOS task + queues) when ENABLE_APPLE_NOTIFICATIONS
+// is 0 (default). See platformio.ini.
+#if ENABLE_APPLE_NOTIFICATIONS
+
 #include "notification_processor.h"
 
 #include "apple_notification.h"
@@ -374,3 +378,5 @@ namespace NotificationProcessor
         return OpenNotifications.size();
     }
 }
+
+#endif  // ENABLE_APPLE_NOTIFICATIONS

@@ -1,3 +1,6 @@
+// Compiled out when ENABLE_APPLE_NOTIFICATIONS is 0 (default). See platformio.ini.
+#if ENABLE_APPLE_NOTIFICATIONS
+
 #include "apple_notification.h"
 
 #include "logger.h"
@@ -205,3 +208,5 @@ namespace AppleNotifications
     }
 
 }
+
+#endif  // ENABLE_APPLE_NOTIFICATIONS

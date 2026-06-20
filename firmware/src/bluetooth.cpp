@@ -16,7 +16,9 @@
 
 #include "apple_media_service.h"
 #include "current_time_service.h"
+#if ENABLE_APPLE_NOTIFICATIONS
 #include "apple_notification_center_service.h"
+#endif
 #include "debug_service.h"
 #include "ble_ota.h"
 #include "navigation_service.h"
@@ -264,6 +266,7 @@ namespace Bluetooth
             }
 
             esp_task_wdt_reset();
+#if ENABLE_APPLE_NOTIFICATIONS
             if( !AppleNotifications::StartNotificationService( Client ) )
             {
                 LOG_ERROR( "failed to start the notification service" );
@@ -273,6 +276,7 @@ namespace Bluetooth
             {
                 LOG_TRACE( "Notification service started" );
             }
+#endif
 
             LOG_TRACE( "HandleConnection finished" );
             PRINT_MEMORY_USAGE();
@@ -359,7 +363,9 @@ namespace Bluetooth
         BLEAdvertisementData scan_response_data;
         scan_response_data.setPartialServices( BLEUUID( DELSOL_VEHICLE_SERVICE_UUID ) );
         setServiceSolicitation( scan_response_data, BLEUUID( APPLE_MUSIC_SERVICE_UUID ) );
+#if ENABLE_APPLE_NOTIFICATIONS
         setServiceSolicitation( scan_response_data, BLEUUID( ANCS_SERVICE_UUID ) );
+#endif
 
         BLEAdvertising* advertising = Server->getAdvertising();
         advertising->setAppearance( 0x0100 );
