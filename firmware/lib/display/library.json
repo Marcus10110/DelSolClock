@@ -1,0 +1,22 @@
+{
+  "name": "display",
+  "version": "0.1.0",
+  "description": "Shared Del Sol display library: screen draw functions over Adafruit GFX. Compiled into both the ESP32 firmware (PlatformIO) and the desktop UiDesigner (CMake).",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "dependencies": {
+    "adafruit/Adafruit GFX Library": "^1.11.9"
+  },
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include",
+    "flags": [
+      "-I fonts"
+    ],
+    "srcFilter": [
+      "+<*>",
+      "-<../compat/>",
+      "-<../vendor/>"
+    ]
+  }
+}

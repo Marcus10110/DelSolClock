@@ -7,8 +7,13 @@
 #include "current_time_service.h"
 #include "apple_media_service.h"
 #include "tft.h"
-#include "display.h"
-#include "screens.h"
+#include "draw_helpers.h"
+#include "clock_screen.h"
+#include "simple_screens.h"
+#include "status_screen.h"
+#include "notification_screens.h"
+#include "gmeter_screen.h"
+#include "image_loader.h"
 #include "pins.h"
 #include "car_io.h"
 #include "bluetooth.h"
@@ -54,11 +59,11 @@ namespace
     const std::string BluetoothDeviceName = "Del Sol";
 
     Tft::Tft* gTft;
-    Display::Display gDisplay;
+    GFXcanvas16 gDisplay( display::kWidth, display::kHeight );
     CurrentScreen gCurrentScreen = CurrentScreen::Default;
 
-    Motion::HistoryTracker BrakeHistoryTracker( Screens::GMeter::HistorySize, 100 );
-    Motion::HistoryTracker LateralHistoryTracker( Screens::GMeter::HistorySize, 100 );
+    Motion::HistoryTracker BrakeHistoryTracker( display::GMeterProps::HistorySize, 100 );
+    Motion::HistoryTracker LateralHistoryTracker( display::GMeterProps::HistorySize, 100 );
 }
 
 void HandlePowerState( const CarIO::CarStatus& car_status );
@@ -88,13 +93,18 @@ void setup()
     gTft->Init();
     Gps::Begin();
     Motion::Begin();
-    Screens::PreloadImages();
+    {
+        const char* images_to_preload[] = { "/bluetooth.bmp", "/light_small.bmp", "/light_large.bmp", "/left.bmp", "/right.bmp" };
+        for( const char* image : images_to_preload )
+        {
+            display::PreloadImage( image );
+        }
+    }
     NotificationProcessor::Init();
 
     {
         // write the splash screen to the display buffer before starting BLE. this uses a huge amount of RAM temporarily.
-        Screens::Splash splash;
-        splash.Draw( &gDisplay );
+        display::DrawSplash( &gDisplay );
         gTft->DrawCanvas( &gDisplay );
         // gTft->DrawBMPDDirect( "/OldSols.bmp" );
     }
@@ -132,9 +142,9 @@ void setup()
     {
         // if we're still not connected, display the connection message. If we still have correct time stored in the RTC system, show time
         // too.
-        Screens::Discoverable discoverable;
-        discoverable.mBluetoothName = BluetoothDeviceName;
-        discoverable.Draw( &gDisplay );
+        display::DiscoverableProps discoverable;
+        discoverable.bluetoothName = BluetoothDeviceName.c_str();
+        display::DrawDiscoverable( &gDisplay, discoverable );
         gTft->DrawCanvas( &gDisplay );
         delay( 1000 );
         // TODO: should we keep this screen up until we get the first connection? Especially since we don't know the time yet?
@@ -162,8 +172,7 @@ void HandlePowerState( const CarIO::CarStatus& car_status )
             LOG_TRACE( "Ignition is off, but Lights are on. Alarm" );
             LightsAlarmActive = true;
             CarIO::StartBeeper( 4, 1100, 80, 125, 1600 );
-            Screens::LightsAlarm lights_alarm;
-            lights_alarm.Draw( &gDisplay );
+            display::DrawLightsAlarm( &gDisplay );
             gTft->DrawCanvas( &gDisplay );
         }
         return;
@@ -236,9 +245,9 @@ void loop()
         if( fw_bytes >= FwBytesReceived )
         {
             FwBytesReceived = fw_bytes;
-            Screens::OtaInProgress ota_screen;
-            ota_screen.mBytesReceived = fw_bytes;
-            ota_screen.Draw( &gDisplay );
+            display::OtaInProgressProps ota_screen;
+            ota_screen.bytesReceived = fw_bytes;
+            display::DrawOtaInProgress( &gDisplay, ota_screen );
             gTft->DrawCanvas( &gDisplay );
         }
         return; // don't do anything else while we're updating.
@@ -292,49 +301,50 @@ void loop()
     if( gCurrentScreen == CurrentScreen::Default )
     {
         // update the display with everything.
-        Screens::Clock clock;
+        display::ClockProps clock;
         tm time;
         if( getLocalTime( &time, 100 ) )
         {
-            clock.mHours24 = time.tm_hour;
-            clock.mMinutes = time.tm_min;
+            clock.hours24 = time.tm_hour;
+            clock.minutes = time.tm_min;
         }
 
         if( Gps::GetGps()->speed.isValid() && Gps::GetGps()->speed.age() < 60000 )
         {
-            clock.mSpeed = Gps::GetGps()->speed.mph();
+            clock.speedMph = Gps::GetGps()->speed.mph();
         }
-        clock.mHeadlight = car_status.mLights;
-        clock.mBluetooth = Bluetooth::IsConnected();
+        clock.headlight = car_status.mLights;
+        clock.bluetooth = Bluetooth::IsConnected();
         const auto& media_info = AppleMediaService::GetMediaInformation();
+        std::string media_title;
         if( media_info.mPlaybackState == AppleMediaService::MediaInformation::PlaybackState::Playing )
         {
-            clock.mMediaArtist = media_info.mArtist;
-            clock.mMediaTitle = media_info.mTitle;
+            media_title = media_info.mTitle;
+            clock.mediaTitle = media_title.c_str();
         }
 
-        clock.Draw( &gDisplay );
+        display::DrawClock( &gDisplay, clock );
         gTft->DrawCanvas( &gDisplay );
     }
     else if( gCurrentScreen == CurrentScreen::Status )
     {
-        Screens::Status status;
-        status.mBatteryVolts = car_status.mBatteryVoltage;
+        display::StatusProps status;
+        status.batteryVolts = car_status.mBatteryVoltage;
         if( Gps::GetGps()->location.isValid() )
         {
-            status.mLatitude = Gps::GetGps()->location.lat();
-            status.mLongitude = Gps::GetGps()->location.lng();
-            status.mSpeedMph = Gps::GetGps()->speed.mph();
-            status.mHeadingDegrees = Gps::GetGps()->course.deg();
+            status.latitude = Gps::GetGps()->location.lat();
+            status.longitude = Gps::GetGps()->location.lng();
+            status.speedMph = Gps::GetGps()->speed.mph();
+            status.headingDegrees = Gps::GetGps()->course.deg();
         }
         auto motion = Motion::GetState();
         if( motion.mValid )
         {
-            status.mForwardG = motion.mForward;
-            status.mLateralG = motion.mLeft;
-            status.mVerticalG = motion.mUp;
+            status.forwardG = motion.mForward;
+            status.lateralG = motion.mLeft;
+            status.verticalG = motion.mUp;
         }
-        status.Draw( &gDisplay );
+        display::DrawStatus( &gDisplay, status );
         gTft->DrawCanvas( &gDisplay );
     }
     else if( gCurrentScreen == CurrentScreen::QM )
@@ -343,27 +353,31 @@ void loop()
     }
     else if( gCurrentScreen == CurrentScreen::Notifications )
     {
-        Screens::Notifications notifications;
         AppleNotifications::NotificationSummary latest_notification;
-        notifications.mHasNotification = NotificationProcessor::GetLatestNotification( latest_notification );
-        notifications.mNotification.mAppIdentifier = latest_notification.mAppIdentifier.value_or( "--" );
-        notifications.mNotification.mTitle = latest_notification.mTitle.value_or( "--" );
-        notifications.mNotification.mMessage = latest_notification.mMessage.value_or( "--" );
-        notifications.mNotification.mSubtitle = latest_notification.mSubtitle.value_or( "--" );
-        notifications.mNotificationCount = NotificationProcessor::GetNotificationCount();
-        notifications.Draw( &gDisplay );
+        display::NotificationsProps notifications;
+        notifications.hasNotification = NotificationProcessor::GetLatestNotification( latest_notification );
+        std::string n_title = latest_notification.mTitle.value_or( "--" );
+        std::string n_message = latest_notification.mMessage.value_or( "--" );
+        std::string n_subtitle = latest_notification.mSubtitle.value_or( "--" );
+        notifications.notification.title = n_title.c_str();
+        notifications.notification.message = n_message.c_str();
+        notifications.notification.subtitle = n_subtitle.c_str();
+        notifications.notificationCount = NotificationProcessor::GetNotificationCount();
+        display::DrawNotifications( &gDisplay, notifications );
         gTft->DrawCanvas( &gDisplay );
     }
     else if( gCurrentScreen == CurrentScreen::Navigation )
     {
-        Screens::Navigation navigation;
         AppleNotifications::NotificationSummary notification;
-        navigation.mHasNotification = NotificationProcessor::GetLatestNavigationNotification( notification );
-        navigation.mNotification.mAppIdentifier = notification.mAppIdentifier.value_or( "--" );
-        navigation.mNotification.mTitle = notification.mTitle.value_or( "--" );
-        navigation.mNotification.mMessage = notification.mMessage.value_or( "--" );
-        navigation.mNotification.mSubtitle = notification.mSubtitle.value_or( "--" );
-        navigation.Draw( &gDisplay );
+        display::NavigationProps navigation;
+        navigation.hasNotification = NotificationProcessor::GetLatestNavigationNotification( notification );
+        std::string nav_title = notification.mTitle.value_or( "--" );
+        std::string nav_message = notification.mMessage.value_or( "--" );
+        std::string nav_subtitle = notification.mSubtitle.value_or( "--" );
+        navigation.notification.title = nav_title.c_str();
+        navigation.notification.message = nav_message.c_str();
+        navigation.notification.subtitle = nav_subtitle.c_str();
+        display::DrawNavigation( &gDisplay, navigation );
         gTft->DrawCanvas( &gDisplay );
     }
     else if( gCurrentScreen == CurrentScreen::GMeter )
@@ -376,22 +390,25 @@ void loop()
         auto motion = Motion::GetState();
         if( !motion.mCalibrated )
         {
-            Screens::CalibrationMissing calibration_missing;
-            calibration_missing.Draw( &gDisplay );
+            display::DrawCalibrationMissing( &gDisplay );
             gTft->DrawCanvas( &gDisplay );
         }
         else
         {
-            Screens::GMeter g_meter;
+            display::GMeterProps g_meter;
+            double brake_history[ display::GMeterProps::HistorySize ] = { 0 };
+            double lateral_history[ display::GMeterProps::HistorySize ] = { 0 };
             if( motion.mValid )
             {
-                g_meter.mBrakeLive = motion.mForward;
-                g_meter.mLateralLive = motion.mLeft;
+                g_meter.brakeLive = motion.mForward;
+                g_meter.lateralLive = motion.mLeft;
 
-                BrakeHistoryTracker.GetData( g_meter.mBrakeHistory, Screens::GMeter::HistorySize );
-                LateralHistoryTracker.GetData( g_meter.mLateralHistory, Screens::GMeter::HistorySize );
+                BrakeHistoryTracker.GetData( brake_history, display::GMeterProps::HistorySize );
+                LateralHistoryTracker.GetData( lateral_history, display::GMeterProps::HistorySize );
+                g_meter.brakeHistory = brake_history;
+                g_meter.lateralHistory = lateral_history;
             }
-            g_meter.Draw( &gDisplay );
+            display::DrawGMeter( &gDisplay, g_meter );
             gTft->DrawCanvas( &gDisplay );
         }
     }

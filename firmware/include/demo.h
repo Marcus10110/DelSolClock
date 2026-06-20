@@ -1,9 +1,6 @@
 #pragma once
 
-namespace Display
-{
-    class Display;
-}
+#include <Adafruit_GFX.h>
 
 namespace Tft
 {
@@ -12,5 +9,5 @@ namespace Tft
 
 namespace Demo
 {
-    void Demo( Display::Display* display, Tft::Tft* tft );
+    void Demo( GFXcanvas16* display, Tft::Tft* tft );
 }

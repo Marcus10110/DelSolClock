@@ -1,12 +1,9 @@
 #pragma once
 #include "car_io.h"
 
-class TinyGPSPlus;
+#include <Adafruit_GFX.h>
 
-namespace Display
-{
-    class Display;
-}
+class TinyGPSPlus;
 
 namespace Tft
 {
@@ -17,5 +14,5 @@ namespace Tft
 namespace QuarterMile
 {
     void Reset();
-    void Service( Display::Display* display, Tft::Tft* tft, CarIO::ButtonEvents button_events, TinyGPSPlus* gps );
+    void Service( GFXcanvas16* display, Tft::Tft* tft, CarIO::ButtonEvents button_events, TinyGPSPlus* gps );
 }

@@ -1,11 +1,12 @@
 #include "quarter_mile.h"
-#include "screens.h"
-#include "display.h"
+#include "quarter_mile_screens.h"
+#include "simple_screens.h"
 #include "tft.h"
 #include "motion.h"
 
 #include <TinyGPSPlus.h>
 
+#include <algorithm>
 #include <optional>
 
 namespace QuarterMile
@@ -29,7 +30,7 @@ namespace QuarterMile
 
         std::optional<Location> mStartLocation;
         uint32_t mStartTimeMs{ 0 };
-        Screens::QuarterMile::Summary gSummary;
+        display::quarter_mile::SummaryProps gSummary;
     }
 
     void Reset()
@@ -37,10 +38,10 @@ namespace QuarterMile
         mState = QuarterMileState::Start;
         mStartLocation = std::nullopt;
         mStartTimeMs = 0;
-        gSummary = Screens::QuarterMile::Summary();
+        gSummary = display::quarter_mile::SummaryProps();
     }
 
-    void Service( Display::Display* display, Tft::Tft* tft, CarIO::ButtonEvents button_events, TinyGPSPlus* gps )
+    void Service( GFXcanvas16* display, Tft::Tft* tft, CarIO::ButtonEvents button_events, TinyGPSPlus* gps )
     {
         // we'll probably draw the screen from here.
         if( mState == QuarterMileState::Start )
@@ -53,14 +54,12 @@ namespace QuarterMile
                     Motion::Calibrate();
                 }
 
-                Screens::CalibrationMissing calibration_missing;
-                calibration_missing.Draw( display );
+                display::DrawCalibrationMissing( display );
                 tft->DrawCanvas( display );
                 return;
             }
 
-            Screens::QuarterMile::Start start;
-            start.Draw( display );
+            display::quarter_mile::DrawStart( display );
             tft->DrawCanvas( display );
 
             if( button_events.mMinuteButtonPressed )
@@ -71,9 +70,9 @@ namespace QuarterMile
         else if( mState == QuarterMileState::Launch )
         {
             auto motion = Motion::GetState();
-            Screens::QuarterMile::Launch launch;
-            launch.mAccelerationG = motion.mForward;
-            launch.Draw( display );
+            display::quarter_mile::LaunchProps launch;
+            launch.accelerationG = motion.mForward;
+            display::quarter_mile::DrawLaunch( display, launch );
             tft->DrawCanvas( display );
             // wait for some g threshold to detect launch.
             // note, we need forward direction specifically!
@@ -102,27 +101,27 @@ namespace QuarterMile
                                                                gps->location.lng() ) *
                                  0.000621371;
             }
-            Screens::QuarterMile::InProgress in_progress;
-            in_progress.mTimeSec = elapsed_ms / 1000.0;
+            display::quarter_mile::InProgressProps in_progress;
+            in_progress.timeSec = elapsed_ms / 1000.0;
 
-            in_progress.mAccelerationG = acceleration.mForward;
-            in_progress.mDistanceMiles = distance_miles;
-            in_progress.mSpeedMph = gps->speed.isValid() ? gps->speed.mph() : 0;
+            in_progress.accelerationG = acceleration.mForward;
+            in_progress.distanceMiles = distance_miles;
+            in_progress.speedMph = gps->speed.isValid() ? gps->speed.mph() : 0;
 
-            gSummary.mMaxAccelerationG = std::max( gSummary.mMaxAccelerationG, in_progress.mAccelerationG );
-            gSummary.mMaxSpeedMph = std::max( gSummary.mMaxSpeedMph, in_progress.mSpeedMph );
+            gSummary.maxAccelerationG = std::max( gSummary.maxAccelerationG, in_progress.accelerationG );
+            gSummary.maxSpeedMph = std::max( gSummary.maxSpeedMph, in_progress.speedMph );
 
-            if( gSummary.mZeroSixtyTimeSec == 0 && in_progress.mSpeedMph >= 60.0 )
+            if( gSummary.zeroSixtyTimeSec == 0 && in_progress.speedMph >= 60.0 )
             {
-                gSummary.mZeroSixtyTimeSec = in_progress.mTimeSec;
+                gSummary.zeroSixtyTimeSec = in_progress.timeSec;
             }
 
-            in_progress.Draw( display );
+            display::quarter_mile::DrawInProgress( display, in_progress );
             tft->DrawCanvas( display );
 
             if( distance_miles >= 0.25 )
             {
-                gSummary.mQuarterMileTimeSec = in_progress.mTimeSec;
+                gSummary.quarterMileTimeSec = in_progress.timeSec;
                 mState = QuarterMileState::Summary;
             }
 
@@ -134,7 +133,7 @@ namespace QuarterMile
         }
         else if( mState == QuarterMileState::Summary )
         {
-            gSummary.Draw( display );
+            display::quarter_mile::DrawSummary( display, gSummary );
             tft->DrawCanvas( display );
 
             // pressing M will start over. press H to exit.
