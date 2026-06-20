@@ -1,0 +1,683 @@
+{
+  "code": "Ok",
+  "waypoints": [
+    {
+      "location": [
+        -122.419449,
+        37.774938
+      ],
+      "name": "Market Street",
+      "distance": 6.089,
+      "time_zone": {
+        "offset": "-07:00",
+        "identifier": "America/Los_Angeles",
+        "abbreviation": "PDT"
+      }
+    },
+    {
+      "location": [
+        -122.418113,
+        37.775112
+      ],
+      "name": "11th Street",
+      "distance": 13.949,
+      "time_zone": {
+        "offset": "-07:00",
+        "identifier": "America/Los_Angeles",
+        "abbreviation": "PDT"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "geometry": "sdr`gApn{nhFoDyEoCmD_C{CY]}CeEwGiJiBiCu@eAi@y@mBoCtAsBZe@PWzAwBvB}CxC_EvAoBhA}AnCsDfAyA",
+      "distance": 165.823,
+      "duration": 53.18,
+      "weight": 37.577,
+      "weight_name": "auto",
+      "duration_typical": 27.748,
+      "weight_typical": 34.817,
+      "legs": [
+        {
+          "steps": [
+            {
+              "geometry": "sdr`gApn{nhFoDyEoCmD_C{CY]}CeEwGiJiBiCu@eAi@y@mBoC",
+              "mode": "driving",
+              "driving_side": "right",
+              "distance": 96.33,
+              "duration": 28.134,
+              "weight": 21.891,
+              "duration_typical": 15.194,
+              "weight_typical": 19.131,
+              "name": "Market Street",
+              "maneuver": {
+                "location": [
+                  -122.419449,
+                  37.774938
+                ],
+                "bearing_before": 0,
+                "bearing_after": 45,
+                "instruction": "Drive northeast on Market Street.",
+                "type": "depart"
+              },
+              "intersections": [
+                {
+                  "location": [
+                    -122.419449,
+                    37.774938
+                  ],
+                  "geometry_index": 0,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "duration": 8.654,
+                  "weight": 4.94,
+                  "out": 0,
+                  "entry": [
+                    true
+                  ],
+                  "bearings": [
+                    45
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "primary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.41934,
+                    37.775026
+                  ],
+                  "geometry_index": 1,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 0.5,
+                  "duration": 3.461,
+                  "weight": 2.495,
+                  "in": 2,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    true,
+                    false,
+                    false
+                  ],
+                  "bearings": [
+                    44,
+                    170,
+                    225,
+                    351
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "primary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.419253,
+                    37.775098
+                  ],
+                  "geometry_index": 2,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 0.5,
+                  "duration": 3.089,
+                  "weight": 2.281,
+                  "in": 2,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false,
+                    false,
+                    false
+                  ],
+                  "bearings": [
+                    44,
+                    173,
+                    224,
+                    353
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "primary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.419175,
+                    37.775162
+                  ],
+                  "geometry_index": 3,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "duration": 0.612,
+                  "weight": 0.22,
+                  "in": 1,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    42,
+                    224
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "primary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.41916,
+                    37.775175
+                  ],
+                  "geometry_index": 4,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 2,
+                  "duration": 2.554,
+                  "weight": 3.857,
+                  "in": 2,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false,
+                    false,
+                    true
+                  ],
+                  "bearings": [
+                    45,
+                    170,
+                    222,
+                    351
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "secondary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.419061,
+                    37.775254
+                  ],
+                  "geometry_index": 5,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 1,
+                  "duration": 4.597,
+                  "weight": 4.342,
+                  "in": 2,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false,
+                    false,
+                    false
+                  ],
+                  "bearings": [
+                    46,
+                    170,
+                    225,
+                    351
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "secondary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.41888,
+                    37.775394
+                  ],
+                  "geometry_index": 6,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "duration": 2.635,
+                  "weight": 1.915,
+                  "in": 1,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    46,
+                    226
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "secondary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.418776,
+                    37.775474
+                  ],
+                  "geometry_index": 8,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "duration": 0.714,
+                  "weight": 0.519,
+                  "in": 1,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    48,
+                    226
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "secondary"
+                  },
+                  "lanes": [
+                    {
+                      "active": false,
+                      "valid": false,
+                      "indications": [
+                        "straight"
+                      ]
+                    },
+                    {
+                      "active": true,
+                      "valid": true,
+                      "valid_indication": "right",
+                      "indications": [
+                        "right"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "location": [
+                    -122.418747,
+                    37.775495
+                  ],
+                  "geometry_index": 9,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "railway_crossing": true,
+                  "in": 1,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    46,
+                    228
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "secondary"
+                  },
+                  "lanes": [
+                    {
+                      "active": false,
+                      "valid": false,
+                      "indications": [
+                        "straight"
+                      ]
+                    },
+                    {
+                      "active": true,
+                      "valid": true,
+                      "valid_indication": "right",
+                      "indications": [
+                        "right"
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "bannerInstructions": [
+                {
+                  "distanceAlongGeometry": 96.33,
+                  "primary": {
+                    "text": "11th Street",
+                    "type": "turn",
+                    "modifier": "right",
+                    "components": [
+                      {
+                        "text": "11th Street",
+                        "type": "text"
+                      }
+                    ]
+                  },
+                  "sub": {
+                    "text": "",
+                    "components": [
+                      {
+                        "text": "",
+                        "type": "lane",
+                        "active": false,
+                        "directions": [
+                          "straight"
+                        ]
+                      },
+                      {
+                        "text": "",
+                        "type": "lane",
+                        "active": true,
+                        "directions": [
+                          "right"
+                        ],
+                        "active_direction": "right"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "geometry": "{js`gAd~ynhFtAsBZe@PWzAwBvB}CxC_EvAoBhA}AnCsDfAyA",
+              "mode": "driving",
+              "driving_side": "right",
+              "distance": 69.493,
+              "duration": 25.046,
+              "weight": 15.686,
+              "duration_typical": 12.554,
+              "weight_typical": 15.686,
+              "name": "11th Street",
+              "maneuver": {
+                "location": [
+                  -122.418675,
+                  37.77555
+                ],
+                "bearing_before": 46,
+                "bearing_after": 133,
+                "modifier": "right",
+                "instruction": "Turn right onto 11th Street.",
+                "type": "turn"
+              },
+              "intersections": [
+                {
+                  "location": [
+                    -122.418675,
+                    37.77555
+                  ],
+                  "geometry_index": 10,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 3,
+                  "duration": 1.895,
+                  "weight": 4.199,
+                  "in": 2,
+                  "out": 1,
+                  "entry": [
+                    true,
+                    true,
+                    false,
+                    false
+                  ],
+                  "bearings": [
+                    48,
+                    133,
+                    226,
+                    310
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "tertiary"
+                  },
+                  "lanes": [
+                    {
+                      "active": false,
+                      "valid": false,
+                      "indications": [
+                        "straight"
+                      ]
+                    },
+                    {
+                      "active": true,
+                      "valid": true,
+                      "valid_indication": "right",
+                      "indications": [
+                        "right"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "location": [
+                    -122.418617,
+                    37.775507
+                  ],
+                  "geometry_index": 11,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 1.5,
+                  "duration": 0.619,
+                  "weight": 1.892,
+                  "in": 3,
+                  "out": 1,
+                  "entry": [
+                    false,
+                    true,
+                    false,
+                    false
+                  ],
+                  "bearings": [
+                    45,
+                    133,
+                    225,
+                    313
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "tertiary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.418598,
+                    37.775493
+                  ],
+                  "geometry_index": 12,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "duration": 4.997,
+                  "weight": 3.163,
+                  "in": 1,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    134,
+                    313
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "tertiary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.418447,
+                    37.775378
+                  ],
+                  "geometry_index": 15,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "duration": 5.141,
+                  "weight": 3.254,
+                  "in": 1,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    135,
+                    314
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "tertiary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.418295,
+                    37.775257
+                  ],
+                  "geometry_index": 17,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "railway_crossing": true,
+                  "duration": 1.581,
+                  "weight": 1.001,
+                  "in": 1,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    135,
+                    315
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "tertiary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.418248,
+                    37.77522
+                  ],
+                  "geometry_index": 18,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 0.15,
+                  "duration": 5.975,
+                  "weight": 1.418,
+                  "in": 2,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    135,
+                    227,
+                    315
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "tertiary"
+                  }
+                },
+                {
+                  "location": [
+                    -122.418158,
+                    37.775148
+                  ],
+                  "geometry_index": 19,
+                  "admin_index": 0,
+                  "is_urban": true,
+                  "turn_weight": 0.15,
+                  "in": 2,
+                  "out": 0,
+                  "entry": [
+                    true,
+                    true,
+                    false
+                  ],
+                  "bearings": [
+                    135,
+                    225,
+                    315
+                  ],
+                  "mapbox_streets_v8": {
+                    "class": "tertiary"
+                  }
+                }
+              ],
+              "bannerInstructions": [
+                {
+                  "distanceAlongGeometry": 69.493,
+                  "primary": {
+                    "text": "Your destination will be on the left",
+                    "type": "arrive",
+                    "modifier": "left",
+                    "components": [
+                      {
+                        "text": "Your destination will be on the left",
+                        "type": "text"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "distanceAlongGeometry": 55.556,
+                  "primary": {
+                    "text": "Your destination is on the left",
+                    "type": "arrive",
+                    "modifier": "left",
+                    "components": [
+                      {
+                        "text": "Your destination is on the left",
+                        "type": "text"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "geometry": "oor`gA`{xnhF??",
+              "mode": "driving",
+              "driving_side": "right",
+              "distance": 0,
+              "duration": 0,
+              "weight": 0,
+              "duration_typical": 0,
+              "weight_typical": 0,
+              "name": "11th Street",
+              "maneuver": {
+                "location": [
+                  -122.418113,
+                  37.775112
+                ],
+                "bearing_before": 135,
+                "bearing_after": 0,
+                "modifier": "left",
+                "instruction": "Your destination is on the left.",
+                "type": "arrive"
+              },
+              "intersections": [
+                {
+                  "location": [
+                    -122.418113,
+                    37.775112
+                  ],
+                  "geometry_index": 20,
+                  "admin_index": 0,
+                  "in": 0,
+                  "entry": [
+                    true
+                  ],
+                  "bearings": [
+                    315
+                  ]
+                }
+              ],
+              "bannerInstructions": []
+            }
+          ],
+          "summary": "Market Street, 11th Street",
+          "distance": 165.823,
+          "duration": 53.18,
+          "weight": 37.577,
+          "duration_typical": 27.748,
+          "weight_typical": 34.817,
+          "admins": [
+            {
+              "iso_3166_1": "US",
+              "iso_3166_1_alpha3": "USA"
+            }
+          ],
+          "via_waypoints": []
+        }
+      ]
+    }
+  ],
+  "uuid": "WV7JY-KjLtgif5VZ8nAM0UEmhxK-vHILvNtof1d2emt_ikIznrO72w=="
+}
