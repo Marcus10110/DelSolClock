@@ -336,6 +336,35 @@ button:disabled {
   opacity: 0.85;
 }
 
+/* ---- BLE probe panel ---- */
+.probe-log {
+  font: 11px/1.4 ui-monospace, Menlo, monospace;
+  background: #0a0c10;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 8px;
+  height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.probe-line {
+  margin: 0 0 2px;
+}
+.probe-ok {
+  color: var(--on);
+}
+.probe-error {
+  color: var(--off);
+}
+.probe-warn {
+  color: #ffd27a;
+}
+.probe-info {
+  color: var(--muted);
+}
+
 /* ---- navigation panel ---- */
 .nav-favs {
   display: flex;

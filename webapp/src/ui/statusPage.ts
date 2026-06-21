@@ -15,6 +15,7 @@ import type {
 import { FirmwarePanel } from './firmwarePanel';
 import { DebugPanel } from './debugPanel';
 import { NavigationPanel } from './navigationPanel';
+import { BleProbePanel } from './bleProbePanel';
 
 const DASH = '--';
 
@@ -25,6 +26,7 @@ export class StatusPage {
   private readonly firmwarePanel = new FirmwarePanel();
   private readonly debugPanel = new DebugPanel();
   private readonly navigationPanel = new NavigationPanel();
+  private readonly bleProbePanel = new BleProbePanel();
 
   // A previously-granted device we can reconnect to without the picker.
   private knownDevice: BluetoothDevice | null = null;
@@ -49,6 +51,7 @@ export class StatusPage {
   private navMount!: HTMLElement;
   private fwMount!: HTMLElement;
   private dbgMount!: HTMLElement;
+  private probeMount!: HTMLElement;
 
   constructor() {
     this.el = document.createElement('div');
@@ -57,6 +60,7 @@ export class StatusPage {
     this.navMount.appendChild(this.navigationPanel.el);
     this.fwMount.appendChild(this.firmwarePanel.el);
     this.dbgMount.appendChild(this.debugPanel.el);
+    this.probeMount.appendChild(this.bleProbePanel.el);
     this.wireEvents();
     this.checkSupport();
     this.render('disconnected');
@@ -119,6 +123,7 @@ export class StatusPage {
       <div id="nav-mount"></div>
       <div id="fw-mount" class="hidden"></div>
       <div id="dbg-mount" class="hidden"></div>
+      <div id="probe-mount"></div>
 
       <div class="card">
         <h2>Log</h2>
@@ -146,6 +151,7 @@ export class StatusPage {
     this.navMount = q('#nav-mount');
     this.fwMount = q('#fw-mount');
     this.dbgMount = q('#dbg-mount');
+    this.probeMount = q('#probe-mount');
     this.logEl = q('#log');
     for (const node of this.el.querySelectorAll<HTMLElement>('[data-flag]')) {
       this.flagEls[node.dataset.flag as string] = node;
