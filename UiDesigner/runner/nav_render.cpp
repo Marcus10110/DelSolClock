@@ -188,14 +188,96 @@ static void WriteRGB24(FILE* f, const uint16_t* fb, int w, int h) {
   }
 }
 
+// Build a frame->distance schedule that eases through maneuvers: the virtual
+// car cruises fast on straights and slows to a near-stop near each maneuver
+// (lingering ~dwellSeconds there with smooth decel/accel), while still covering
+// the whole route in exactly totalFrames. Done by integrating a per-distance
+// "time cost" (1/speed) so slow regions naturally get more frames.
+static std::vector<double> buildSpeedSchedule(const nav::RouteSummary& route,
+                                              const std::vector<double>& cum,
+                                              int totalFrames,
+                                              double dwellSeconds, int fps) {
+  const double total = cum.back();
+  // Maneuver distances along the route (skip depart/arrive endpoints).
+  std::vector<double> mDist;
+  for (const auto& m : route.maneuvers) {
+    if (m.polylineIndex < 0 || m.polylineIndex >= (int)cum.size()) continue;
+    if (m.type == "depart" || m.type == "arrive") continue;
+    mDist.push_back(cum[m.polylineIndex]);
+  }
+
+  // Speed multiplier in [slow,1] at a given distance: 1 on straights, dropping
+  // to `slow` within ±window m of any maneuver, with cosine ramps.
+  constexpr double kWindow = 45.0;  // meters of slow-down around a maneuver
+  constexpr double kSlow = 0.18;    // fraction of cruise speed at a maneuver
+  auto speedAt = [&](double d) -> double {
+    double s = 1.0;
+    for (double md : mDist) {
+      double dist = std::abs(d - md);
+      if (dist < kWindow) {
+        // 0 at the maneuver -> 1 at the window edge (cosine ease).
+        double t = dist / kWindow;
+        double ease = 0.5 - 0.5 * std::cos(t * 3.14159265358979);  // 0..1
+        double local = kSlow + (1.0 - kSlow) * ease;
+        s = std::min(s, local);
+      }
+    }
+    return s;
+  };
+
+  // Integrate cost = 1/speed over the route (fine steps) to get cumulative time.
+  const int kSteps = 4000;
+  std::vector<double> dAt(kSteps + 1), timeAt(kSteps + 1);
+  double t = 0.0;
+  for (int i = 0; i <= kSteps; ++i) {
+    double d = total * i / kSteps;
+    dAt[i] = d;
+    timeAt[i] = t;
+    if (i < kSteps) {
+      double dd = total / kSteps;
+      double mid = total * (i + 0.5) / kSteps;
+      t += dd / speedAt(mid);
+    }
+  }
+  const double totalTime = timeAt[kSteps];
+
+  // Map each frame's uniform time to a distance (invert the time curve).
+  std::vector<double> frameDist(totalFrames);
+  int idx = 0;
+  for (int fr = 0; fr < totalFrames; ++fr) {
+    double targetTime = totalTime * fr / std::max(1, totalFrames - 1);
+    while (idx < kSteps && timeAt[idx + 1] < targetTime) ++idx;
+    double seg = timeAt[idx + 1] - timeAt[idx];
+    double frac = seg > 1e-9 ? (targetTime - timeAt[idx]) / seg : 0.0;
+    frameDist[fr] = dAt[idx] + (dAt[idx + 1] - dAt[idx]) * frac;
+  }
+  (void)dwellSeconds;
+  (void)fps;
+  return frameDist;
+}
+
 // Render a flythrough of the whole route to a raw RGB24 stream, then invoke
-// ffmpeg to encode out/nav_route.mp4. fps * seconds frames are spaced evenly by
-// distance along the route. Returns false on I/O / encode failure.
+// ffmpeg to encode out/nav_route.mp4. Frames ease through maneuvers (slow near
+// turns, fast on straights) while totaling fps*seconds frames. Returns false on
+// I/O / encode failure.
 static bool RenderVideo(const nav::RouteSummary& route,
                         const std::vector<double>& cum, int fps, int seconds) {
   const int W = display::kWidth, H = display::kHeight;
   const int totalFrames = fps * seconds;
   const double total = cum.back();
+  const std::vector<double> frameDist =
+      buildSpeedSchedule(route, cum, totalFrames, /*dwellSeconds=*/2.0, fps);
+  // Speed-profile sanity check: report slowest/fastest per-frame advance.
+  {
+    double minStep = 1e9, maxStep = 0;
+    for (int i = 1; i < totalFrames; ++i) {
+      double s = frameDist[i] - frameDist[i - 1];
+      if (s < minStep) minStep = s;
+      if (s > maxStep) maxStep = s;
+    }
+    std::printf("schedule: slowest %.2f m/frame, fastest %.2f m/frame (%.0fx)\n",
+                minStep, maxStep, maxStep / (minStep > 1e-6 ? minStep : 1));
+  }
   const fs::path raw = fs::path("out") / "nav_video.rgb";
 
   FILE* f = nullptr;
@@ -211,13 +293,11 @@ static bool RenderVideo(const nav::RouteSummary& route,
 
   GFXcanvas16 canvas(W, H);
   for (int i = 0; i < totalFrames; ++i) {
-    double frac = totalFrames > 1
-                      ? static_cast<double>(i) / (totalFrames - 1)
-                      : 0.0;
+    double d = frameDist[i];
     // Phase tracks distance traveled so the centerline dashes flow with the road
-    // toward the camera (phase increases as the car advances).
-    float phase = static_cast<float>(frac * total);
-    RenderAt(canvas, route, cum, frac * total, phase);
+    // toward the camera (and slow/stop as the schedule slows near maneuvers).
+    float phase = static_cast<float>(d);
+    RenderAt(canvas, route, cum, d, phase);
     WriteRGB24(f, canvas.getBuffer(), W, H);
     if (i % fps == 0) {
       std::printf("\rrendering video %d/%d frames", i, totalFrames);
