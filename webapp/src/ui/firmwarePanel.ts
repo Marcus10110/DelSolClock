@@ -184,12 +184,7 @@ export class FirmwarePanel {
   }): Promise<void> {
     if (this.busy) return;
     if (!this.conn || !this.conn.isConnected) {
-      alert(
-        `Connect to the device before updating the ${opts.kind}.\n\n` +
-          `[debug] conn=${this.conn ? 'set' : 'null'} ` +
-          `state=${this.conn?.state ?? 'n/a'} ` +
-          `isConnected=${this.conn?.isConnected ?? 'n/a'}`,
-      );
+      alert(`Connect to the device before updating the ${opts.kind}.`);
       return;
     }
 

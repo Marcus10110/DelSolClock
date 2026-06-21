@@ -264,16 +264,19 @@ export class StatusPage {
     this.fwMount.classList.toggle('hidden', !connected);
     this.dbgMount.classList.toggle('hidden', !connected);
 
-    // Nav panel stays visible while disconnected (search/preview are useful
-    // pre-connection); it just reflects connection state on its Send button.
+    // Reflect connection state on the panels on EVERY render. This must not clear
+    // the connection only in the disconnected branch: during connect, the
+    // intermediate 'requesting'/'connecting' states would clear it and the final
+    // 'connected' state would never restore it (the panel would be left null even
+    // though we're connected). Set based on `connected` every time instead.
     this.navigationPanel.setConnection(connected ? this.conn : null);
+    this.firmwarePanel.setConnection(connected ? this.conn : null);
+    this.debugPanel.setConnection(connected ? this.conn : null);
 
     if (connected) {
       this.deviceVal.textContent = this.conn?.deviceName ?? DASH;
     } else {
       this.resetDetails();
-      this.firmwarePanel.setConnection(null);
-      this.debugPanel.setConnection(null);
     }
   }
 
