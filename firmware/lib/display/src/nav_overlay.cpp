@@ -10,15 +10,18 @@ namespace display {
 namespace {
 
 // High-contrast palette. The strips are near-black so light text/arrows pop
-// against both the road and the sky.
+// against both the road and the sky. Synthwave-night HUD chrome: a glowing
+// border + dividers around the bars, like a game HUD.
 constexpr uint16_t kStripBg = 0x0000;     // solid black backing
 constexpr uint16_t kStripLine = 0x4208;   // thin separator line (mid grey)
 constexpr uint16_t kFg = 0xFFFF;          // white text/arrows (max contrast)
-constexpr uint16_t kAccent = 0xFD20;      // amber accent for distance (warm, pops)
+constexpr uint16_t kAccent = 0x07FF;      // cyan accent for distance (synthwave)
 constexpr uint16_t kDim = 0xC618;         // light grey for secondary labels
+constexpr uint16_t kChrome = 0xF81F;      // magenta HUD border (glow)
+constexpr uint16_t kChromeDim = 0x6010;   // dim magenta for inner dividers
 
 constexpr int16_t kStripH = 34;  // top strip height
-constexpr int16_t kBarH = 14;    // bottom bar height
+constexpr int16_t kBarH = 16;    // bottom bar height (a touch taller for chrome)
 
 // ---- Direction arrow -------------------------------------------------------
 // Drawn as a chunky filled arrow inside a box centred at (cx, cy) with the given
@@ -98,7 +101,13 @@ void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
   // ----- Top strip: arrow + distance + street -----
   if (props.dir != TurnDir::None) {
     gfx->fillRect(0, 0, W, kStripH, kStripBg);
-    gfx->drawFastHLine(0, kStripH, W, kStripLine);
+    // HUD chrome: a glowing magenta underline with brighter corner ticks, and a
+    // thin divider separating the arrow box from the text.
+    gfx->drawFastHLine(0, kStripH, W, kChromeDim);
+    gfx->drawFastHLine(0, kStripH + 1, W, kChrome);
+    gfx->drawFastVLine(0, 0, kStripH, kChrome);
+    gfx->drawFastVLine(W - 1, 0, kStripH, kChrome);
+    gfx->drawFastVLine(34, 3, kStripH - 6, kChromeDim);  // arrow / text divider
 
     // Arrow box on the left.
     const int16_t arrowCx = 18;
@@ -138,18 +147,28 @@ void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
 
   // ----- Bottom bar: ETA / remaining / speed -----
   if (props.showBottomBar) {
-    const int16_t barY = gfx->height() - kBarH;
+    const int16_t H = gfx->height();
+    const int16_t barY = H - kBarH;
     gfx->fillRect(0, barY, W, kBarH, kStripBg);
-    gfx->drawFastHLine(0, barY, W, kStripLine);
+    // HUD chrome: glowing magenta top border + corner ticks + field dividers.
+    gfx->drawFastHLine(0, barY, W, kChrome);
+    gfx->drawFastHLine(0, barY + 1, W, kChromeDim);
+    gfx->drawFastVLine(0, barY, kBarH, kChrome);
+    gfx->drawFastVLine(W - 1, barY, kBarH, kChrome);
+    // Two dividers splitting the bar into ETA | remaining | speed thirds.
+    const int16_t div1 = W / 3;
+    const int16_t div2 = (W * 2) / 3;
+    gfx->drawFastVLine(div1, barY + 3, kBarH - 4, kChromeDim);
+    gfx->drawFastVLine(div2, barY + 3, kBarH - 4, kChromeDim);
 
     gfx->setFont(&JetBrainsMono_Thin7pt7b);
     gfx->setTextSize(1);
-    const int16_t textY = gfx->height() - 4;
+    const int16_t textY = H - 4;
 
-    // Left: ETA. Center: remaining. Right: speed (+ "mph").
+    // Left: ETA. Center: remaining. Right: speed (boxed, like a HUD readout).
     if (!props.eta.empty()) {
       gfx->setTextColor(kFg);
-      gfx->setCursor(4, textY);
+      gfx->setCursor(5, textY);
       gfx->print(props.eta.c_str());
     }
     if (!props.remaining.empty()) {
@@ -159,11 +178,13 @@ void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
       gfx->print(props.remaining.c_str());
     }
     if (!props.speed.empty()) {
-      std::string sp = props.speed + " mph";
-      int16_t w = MeasureWidth(&JetBrainsMono_Thin7pt7b, sp);
-      gfx->setTextColor(kFg);
-      gfx->setCursor(W - w - 4, textY);
-      gfx->print(sp.c_str());
+      // Speed sits in the right third; draw it cyan and boxed for a HUD readout.
+      int16_t w = MeasureWidth(&JetBrainsMono_Thin7pt7b, props.speed);
+      int16_t sx = W - w - 8;
+      gfx->setTextColor(kAccent);
+      gfx->setCursor(sx, textY);
+      gfx->print(props.speed.c_str());
+      gfx->drawRect(sx - 3, barY + 2, w + 6, kBarH - 4, kChromeDim);
     }
   }
 }

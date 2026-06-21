@@ -7,6 +7,7 @@
 //   nav_render <route.txt> [numSamples]
 #include <cstdint>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -140,14 +141,24 @@ static display::NavOverlayProps buildOverlay(const nav::RouteSummary& route,
 // Render the perspective view + nav overlay at a given distance along the route
 // into `canvas`. Returns the number of centerline points used (0 => degenerate).
 static size_t RenderAt(GFXcanvas16& canvas, const nav::RouteSummary& route,
-                       const std::vector<double>& cum, double distanceM) {
+                       const std::vector<double>& cum, double distanceM,
+                       float phaseM = 0.0f) {
   nav::LatLng pos = posAtDistance(route, cum, distanceM);
   nav::CenterlineParams cp;
   cp.aheadMeters = 200.0;  // look farther so 100m-out turns enter view
   auto local = nav::routeCenterline(route, pos, cp);
 
+  // Heading: bearing of the route from here to ~20m ahead (compass degrees,
+  // 0 = N, 90 = E). Drives the background skyline pan.
+  nav::LatLng ahead = posAtDistance(route, cum, distanceM + 20.0);
+  nav::MetersEN d = nav::localOffsetMeters(ahead, pos);
+  float heading = static_cast<float>(std::atan2(d.east, d.north) * 180.0 / 3.14159265358979);
+  if (heading < 0) heading += 360.0f;
+
   display::PerspectiveProps p;
   p.maxDrawDistanceM = 200.0;  // match the centerline look-ahead
+  p.headingDegrees = heading;
+  p.centerlinePhaseM = phaseM;
   for (const auto& lp : local) {
     p.centerline.push_back(
         {static_cast<float>(lp.forward), static_cast<float>(lp.right)});
@@ -202,7 +213,10 @@ static bool RenderVideo(const nav::RouteSummary& route,
     double frac = totalFrames > 1
                       ? static_cast<double>(i) / (totalFrames - 1)
                       : 0.0;
-    RenderAt(canvas, route, cum, frac * total);
+    // Phase tracks distance traveled so the centerline dashes flow with the road
+    // toward the camera (phase increases as the car advances).
+    float phase = static_cast<float>(frac * total);
+    RenderAt(canvas, route, cum, frac * total, phase);
     WriteRGB24(f, canvas.getBuffer(), W, H);
     if (i % fps == 0) {
       std::printf("\rrendering video %d/%d frames", i, totalFrames);
@@ -234,6 +248,23 @@ static bool RenderVideo(const nav::RouteSummary& route,
   return true;
 }
 
+// Render the full 360° skyline panorama to out/skyline_360.bmp for review. The
+// canvas is the panorama width; horizonY leaves a little ground below the city.
+static void RenderSkyline360() {
+  const int W = display::PanoramaWidth();
+  const int H = 110;
+  const int16_t horizonY = 92;  // buildings rest here, ~92px of sky band
+  GFXcanvas16 pano(W, H);
+  display::DrawSkylinePanorama(&pano, horizonY);
+  // 0/90/180/270° tick marks along the bottom so bearings are easy to read.
+  for (int deg = 0; deg < 360; deg += 90) {
+    int x = static_cast<int>(deg / 360.0 * W);
+    pano.drawFastVLine(x, H - 6, 6, 0xFFFF);
+  }
+  SaveBMP24(fs::path("out") / "skyline_360.bmp", pano.getBuffer(), W, H);
+  std::printf("Wrote out/skyline_360.bmp (%dx%d, full 360 panorama)\n", W, H);
+}
+
 int main(int argc, char** argv) {
   if (argc < 2) {
     std::fprintf(stderr,
@@ -261,6 +292,7 @@ int main(int argc, char** argv) {
   const double total = cum.back();
 
   fs::create_directories("out");
+  RenderSkyline360();  // always export the full panorama for review
   if (videoMode) {
     return RenderVideo(route, cum, fps, seconds) ? 0 : 1;
   }

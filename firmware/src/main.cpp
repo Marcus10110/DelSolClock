@@ -468,6 +468,27 @@ void loop()
 
             display::PerspectiveProps persp;
             persp.maxDrawDistanceM = 200.0f;
+            // Heading drives the background skyline pan. Prefer GPS course (valid
+            // while moving); leave -1 (skyline off) when course is unknown.
+            auto* gps_h = Gps::GetGps();
+            if( gps_h->course.isValid() && gps_h->course.age() < 5000 )
+            {
+                persp.headingDegrees = static_cast<float>( gps_h->course.deg() );
+            }
+
+            // Animate the centerline dashes, scrolling toward the camera at a rate
+            // set by 3 speed tiers (stopped / slow / fast). The phase accumulates
+            // across frames; increasing it flows dashes toward you.
+            static float nav_dash_phase = 0.0f;
+            float mph_now = ( gps_h->speed.isValid() && gps_h->speed.age() < 5000 )
+                                ? static_cast<float>( gps_h->speed.mph() )
+                                : 0.0f;
+            float tier_step = 0.0f;                  // stopped: no scroll
+            if( mph_now >= 25.0f ) tier_step = 1.2f; // fast
+            else if( mph_now >= 3.0f ) tier_step = 0.5f;  // slow
+            nav_dash_phase += tier_step;
+            persp.centerlinePhaseM = nav_dash_phase;
+
             persp.centerline.reserve( gNavCenterline.size() );
             for( const auto& lp : gNavCenterline )
             {

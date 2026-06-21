@@ -200,12 +200,14 @@ const std::vector<DemoScreen> g_demo_screens = {
     {"Perspective-Straight",
      [](Adafruit_GFX* g) {
        display::PerspectiveProps p;  // no centerline => straight road
+       p.headingDegrees = 30.0f;     // show the skyline
        display::DrawPerspective(g, p);
      }},
 
     {"Perspective-CurveRight",
      [](Adafruit_GFX* g) {
        display::PerspectiveProps p;
+       p.headingDegrees = 120.0f;
        // Synthetic centerline curving to the right ahead of the car.
        for (float d = 1.0f; d <= 120.0f; d += 4.0f) {
          float right = 0.0008f * d * d;  // gentle rightward bend
@@ -217,6 +219,7 @@ const std::vector<DemoScreen> g_demo_screens = {
     {"Perspective-CurveLeft",
      [](Adafruit_GFX* g) {
        display::PerspectiveProps p;
+       p.headingDegrees = 250.0f;
        for (float d = 1.0f; d <= 120.0f; d += 4.0f) {
          float right = -0.0008f * d * d;
          p.centerline.push_back({d, right});

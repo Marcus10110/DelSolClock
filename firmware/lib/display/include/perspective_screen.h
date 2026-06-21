@@ -27,11 +27,29 @@ struct PerspectiveProps {
   float focalPx{80.0f};        // focal length in pixels (controls FOV/steepness)
   float maxDrawDistanceM{120.0f};  // clip the road beyond this distance
 
+  // Current compass heading in degrees (0 = N, 90 = E). Pans the background city
+  // skyline so the world feels anchored as the car turns. Negative => no skyline
+  // (the caller can disable it when heading is unknown).
+  float headingDegrees{-1.0f};
+
+  // Centerline dash animation: a phase offset in meters that the caller advances
+  // over time (faster = dashes flow toward you faster). The dash pattern is keyed
+  // to world distance + this phase, so it scrolls smoothly and stays perspective-
+  // correct. 0 => static dashes (no animation).
+  float centerlinePhaseM{0.0f};
+
   // Upcoming route centerline in car-local meters, ordered from the car forward.
   // Empty => draw a straight road (step 1a behavior).
   std::vector<CenterlinePoint> centerline;
 };
 
 void DrawPerspective(Adafruit_GFX* gfx, const PerspectiveProps& props);
+
+// Render the full 360° skyline panorama into `gfx` for review (UiDesigner). The
+// panorama is PanoramaWidth() px wide; `gfx` should be that wide and tall enough
+// for the sky band. `horizonY` is where buildings rest (their bases). Buildings
+// are drawn from a top inset of 0 down to horizonY.
+int PanoramaWidth();
+void DrawSkylinePanorama(Adafruit_GFX* gfx, int16_t horizonY);
 
 }  // namespace display
