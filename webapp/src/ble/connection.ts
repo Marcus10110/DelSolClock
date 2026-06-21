@@ -395,8 +395,14 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
           this.log('error', `Unexpected response: "${response}"`);
         }
 
+        const bytesSent = Math.min((i + 1) * FIRMWARE_CHUNK_SIZE, total);
         const percent = 10 + Math.round(((i + 1) * 85) / totalChunks);
-        onProgress({ percent, message: `Uploading… ${i + 1}/${totalChunks} chunks` });
+        onProgress({
+          percent,
+          message: `Uploading… ${i + 1}/${totalChunks} chunks`,
+          bytesSent,
+          totalBytes: total,
+        });
       }
 
       if (needsZeroLengthChunk) {

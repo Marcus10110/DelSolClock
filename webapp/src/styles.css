@@ -280,6 +280,20 @@ button:disabled {
 .fw-update-fs {
   font-size: 13px;
 }
+.fw-fs-current {
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+.fw-fs-hash {
+  font-size: 11px;
+  margin: 2px 0 0;
+}
+.fw-fs-current code,
+.fw-fs-hash code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  color: var(--muted);
+}
 
 .fw-progress-wrap {
   padding: 6px 0 4px;
@@ -307,6 +321,13 @@ button:disabled {
   font-size: 13px;
   color: var(--muted);
   margin-top: 4px;
+}
+.fw-stats {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  margin-top: 2px;
+  min-height: 1em; /* reserve space so the bar doesn't jump when text appears */
 }
 
 /* ---- debug panel ---- */

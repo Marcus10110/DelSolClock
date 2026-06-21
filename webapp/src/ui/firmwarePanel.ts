@@ -2,7 +2,7 @@
 // Mirrors the MAUI UpdatePage. Owns its own DOM; the StatusPage mounts it and
 // hands it the active IConnection (real or demo) when connected.
 
-import type { IConnection } from '../ble/iconnection';
+import type { FirmwareUpdateProgress, IConnection } from '../ble/iconnection';
 import type { FirmwareInfo } from '../ble/parsers';
 import {
   downloadFilesystem,
@@ -96,7 +96,14 @@ export class FirmwarePanel {
     const deviceFsHash = this.deviceInfo?.fsHash ?? null;
     const deviceSupportsFs = (this.deviceInfo?.proto ?? 1) >= 2;
 
-    list.innerHTML = this.releases
+    // Header: show the device's current filesystem hash (full, monospace) so it's
+    // visible at a glance and can be compared against any release.
+    const fsHeader =
+      deviceSupportsFs && deviceFsHash
+        ? `<div class="fw-fs-current muted-text">Device filesystem: <code title="${escapeHtml(deviceFsHash)}">${escapeHtml(deviceFsHash)}</code></div>`
+        : '';
+
+    list.innerHTML = fsHeader + this.releases
       .map((r, i) => {
         const size = r.firmwareAsset ? formatBytes(r.firmwareAsset.size) : '';
         const date = formatDate(r.publishedAt);
@@ -109,12 +116,14 @@ export class FirmwarePanel {
           const matches =
             deviceFsHash !== null &&
             deviceFsHash.toLowerCase() === r.meta.fsSha256.toLowerCase();
+          const relHash = r.meta.fsSha256.toLowerCase();
           fsRow = matches
             ? `<div class="fw-fs-row"><span class="fw-fs-badge fw-fs-ok">✓ Filesystem up to date</span></div>`
             : `<div class="fw-fs-row">
                  <span class="fw-fs-badge fw-fs-diff">Filesystem differs</span>
                  <button class="fw-update-fs" data-index="${i}">Update filesystem</button>
-               </div>`;
+               </div>
+               <div class="fw-fs-hash muted-text">This release: <code title="${escapeHtml(relHash)}">${escapeHtml(relHash)}</code></div>`;
         }
 
         return `
@@ -187,7 +196,7 @@ export class FirmwarePanel {
     download: (asset: ReleaseAsset) => Promise<Uint8Array>;
     flash: (
       data: Uint8Array,
-      onProgress: (p: { percent: number; message: string }) => void,
+      onProgress: (p: FirmwareUpdateProgress) => void,
     ) => Promise<boolean>;
   }): Promise<void> {
     if (this.busy) return;
@@ -210,11 +219,15 @@ export class FirmwarePanel {
         <div class="fw-progress-msg" id="fw-msg">Starting…</div>
         <div class="fw-bar"><div class="fw-bar-fill" id="fw-fill" style="width:0%"></div></div>
         <div class="fw-pct" id="fw-pct">0%</div>
+        <div class="fw-stats muted-text" id="fw-stats"></div>
       </div>`;
 
     const msgEl = this.el.querySelector('#fw-msg') as HTMLElement;
     const fillEl = this.el.querySelector('#fw-fill') as HTMLElement;
     const pctEl = this.el.querySelector('#fw-pct') as HTMLElement;
+    const statsEl = this.el.querySelector('#fw-stats') as HTMLElement;
+
+    const rate = new RateEstimator();
 
     try {
       msgEl.textContent = `Downloading ${opts.kind}…`;
@@ -226,16 +239,30 @@ export class FirmwarePanel {
         fillEl.style.width = `${p.percent}%`;
         pctEl.textContent = `${p.percent}%`;
         msgEl.textContent = p.message;
+
+        // Speed + ETA from the smoothed byte rate (BLE chunk times are jittery).
+        if (p.bytesSent !== undefined && p.totalBytes) {
+          rate.update(p.bytesSent);
+          const bps = rate.bytesPerSecond();
+          if (bps > 0) {
+            const remaining = Math.max(0, p.totalBytes - p.bytesSent);
+            const etaSec = remaining / bps;
+            statsEl.textContent = `${formatRate(bps)} · ${formatEta(etaSec)} remaining`;
+          }
+        }
       });
 
+      statsEl.textContent = '';
       if (success) {
-        this.log('ok', `${opts.kind} update complete.`);
+        const elapsed = rate.elapsedSeconds();
+        this.log('ok', `${opts.kind} update complete in ${formatEta(elapsed)}.`);
         msgEl.innerHTML = `<span class="fw-ok">✅ Update complete. The device will reboot.</span>`;
       } else {
         this.log('error', `${opts.kind} update failed (see prior log lines).`);
         msgEl.innerHTML = `<span class="fw-error">❌ Update failed. See log for details.</span>`;
       }
     } catch (err) {
+      statsEl.textContent = '';
       const m = err instanceof Error ? err.message : String(err);
       this.log('error', `${opts.kind} update error: ${m}`);
       msgEl.innerHTML = `<span class="fw-error">❌ ${escapeHtml(m)}</span>`;
@@ -258,6 +285,66 @@ function renderNotes(body: string): string {
   const cleaned = body.replace(/<!--\s*delsol-meta[\s\S]*?-->/g, '').trim();
   if (!cleaned) return '';
   return `<details class="fw-notes"><summary>Release notes</summary><pre>${escapeHtml(cleaned)}</pre></details>`;
+}
+
+/**
+ * Smoothed transfer-rate estimator for ETA. BLE chunk acks arrive unevenly, so
+ * an instantaneous rate jumps around; this blends each sample into an
+ * exponential moving average for a steady speed/ETA readout.
+ */
+class RateEstimator {
+  private startMs = Date.now();
+  private lastMs = this.startMs;
+  private lastBytes = 0;
+  private emaBps = 0;
+  private started = false;
+
+  /** Feed the cumulative bytes-sent so far. */
+  update(bytesSent: number): void {
+    const now = Date.now();
+    if (!this.started) {
+      // First sample establishes the baseline (don't count pre-stream time).
+      this.started = true;
+      this.startMs = now;
+      this.lastMs = now;
+      this.lastBytes = bytesSent;
+      return;
+    }
+    const dtSec = (now - this.lastMs) / 1000;
+    const dBytes = bytesSent - this.lastBytes;
+    if (dtSec > 0 && dBytes >= 0) {
+      const sampleBps = dBytes / dtSec;
+      // EMA: weight new samples ~30%. Seed with the first real sample.
+      this.emaBps = this.emaBps === 0 ? sampleBps : 0.7 * this.emaBps + 0.3 * sampleBps;
+      this.lastMs = now;
+      this.lastBytes = bytesSent;
+    }
+  }
+
+  bytesPerSecond(): number {
+    return this.emaBps;
+  }
+
+  elapsedSeconds(): number {
+    return (Date.now() - this.startMs) / 1000;
+  }
+}
+
+function formatRate(bps: number): string {
+  if (bps >= 1024 * 1024) return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+  if (bps >= 1024) return `${(bps / 1024).toFixed(1)} KB/s`;
+  return `${Math.round(bps)} B/s`;
+}
+
+/** Human ETA: "<1s", "12s", "1m 05s", "3m". */
+function formatEta(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '—';
+  const s = Math.round(seconds);
+  if (s < 1) return '<1s';
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem === 0 ? `${m}m` : `${m}m ${String(rem).padStart(2, '0')}s`;
 }
 
 function formatBytes(n: number): string {

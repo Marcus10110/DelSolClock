@@ -100,8 +100,14 @@ export class DemoConnection extends Emitter<ConnectionEvents> implements IConnec
     onProgress({ percent: 10, message: `Uploading ${label} (${data.length} bytes)…` });
     for (let i = 0; i < totalChunks; i++) {
       await delay(40);
+      const bytesSent = Math.min((i + 1) * 512, data.length);
       const percent = 10 + Math.round(((i + 1) * 85) / totalChunks);
-      onProgress({ percent, message: `Uploading… ${i + 1}/${totalChunks} chunks` });
+      onProgress({
+        percent,
+        message: `Uploading… ${i + 1}/${totalChunks} chunks`,
+        bytesSent,
+        totalBytes: data.length,
+      });
     }
     onProgress({ percent: 100, message: 'Update completed successfully.' });
     this.log('ok', `Demo ${label} flash complete.`);

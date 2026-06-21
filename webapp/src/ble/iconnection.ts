@@ -25,6 +25,10 @@ export interface FirmwareUpdateProgress {
   /** 0–100. */
   percent: number;
   message: string;
+  /** Image bytes sent so far (for speed/ETA). Omitted before streaming starts. */
+  bytesSent?: number;
+  /** Total image bytes to send (for speed/ETA). */
+  totalBytes?: number;
 }
 
 export interface CrashDumpStatus {
