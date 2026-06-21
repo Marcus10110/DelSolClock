@@ -17,6 +17,7 @@
 #include <Adafruit_GFX.h>
 
 #include "perspective_screen.h"
+#include "nav_overlay.h"
 #include "draw_helpers.h"
 #include "route_io.h"
 #include "geo.h"
@@ -89,8 +90,88 @@ struct Sample {
   std::string label;  // short descriptor for the grid / filename
 };
 
-// Render the perspective view at a given distance along the route into `canvas`.
-// Returns the number of centerline points used (0 => degenerate / near the end).
+// ---- Navigation overlay data (computed from the route for the harness) ------
+// On the firmware this comes from the matcher; here we derive it directly from
+// the route + current distance-along so we can preview the overlay.
+
+// Map a Mapbox maneuver type+modifier to the display's TurnDir.
+static display::TurnDir toTurnDir(const std::string& type,
+                                  const std::string& modifier) {
+  if (type == "arrive") return display::TurnDir::Arrive;
+  if (modifier == "uturn") return display::TurnDir::UTurn;
+  if (modifier == "sharp left") return display::TurnDir::SharpLeft;
+  if (modifier == "left") return display::TurnDir::Left;
+  if (modifier == "slight left") return display::TurnDir::SlightLeft;
+  if (modifier == "sharp right") return display::TurnDir::SharpRight;
+  if (modifier == "right") return display::TurnDir::Right;
+  if (modifier == "slight right") return display::TurnDir::SlightRight;
+  return display::TurnDir::Straight;  // continue / straight / merge / depart
+}
+
+// Format a distance in meters to an imperial string. Feet under ~0.1 mi (rounded
+// to a tidy step), miles with one decimal above. (Metric toggle later.)
+static std::string fmtDistanceImperial(double meters) {
+  const double feet = meters * 3.28084;
+  char buf[24];
+  if (feet < 1000.0) {
+    int ft = static_cast<int>(feet);
+    int step = ft < 200 ? 25 : 50;          // tidy increments
+    ft = (ft / step) * step;
+    if (ft < step) ft = step;               // never show 0 ft while approaching
+    std::snprintf(buf, sizeof(buf), "%d ft", ft);
+  } else {
+    double mi = meters / 1609.344;
+    std::snprintf(buf, sizeof(buf), "%.1f mi", mi);
+  }
+  return buf;
+}
+
+// Build the overlay props for a position `distanceM` along the route: find the
+// next maneuver ahead, the distance to it, the street, and route totals.
+static display::NavOverlayProps buildOverlay(const nav::RouteSummary& route,
+                                             const std::vector<double>& cum,
+                                             double distanceM) {
+  display::NavOverlayProps ov;
+
+  // Next maneuver at or ahead of distanceM.
+  const nav::RouteManeuver* next = nullptr;
+  double nextDist = 0;
+  for (const auto& m : route.maneuvers) {
+    if (m.polylineIndex < 0 ||
+        m.polylineIndex >= static_cast<int>(cum.size())) continue;
+    double md = cum[m.polylineIndex];
+    if (md + 1.0 >= distanceM) {  // small epsilon so we don't skip the one we're at
+      // skip the depart maneuver at the very start
+      if (m.type == "depart") continue;
+      next = &m;
+      nextDist = md - distanceM;
+      break;
+    }
+  }
+  if (next) {
+    ov.dir = toTurnDir(next->type, next->modifier);
+    ov.distance = fmtDistanceImperial(nextDist > 0 ? nextDist : 0);
+    ov.street = next->roadName;
+  } else {
+    ov.dir = display::TurnDir::None;
+  }
+
+  // Remaining distance to destination.
+  double remaining = cum.back() - distanceM;
+  if (remaining < 0) remaining = 0;
+  char rb[24];
+  std::snprintf(rb, sizeof(rb), "%.1f mi", remaining / 1609.344);
+  ov.remaining = rb;
+
+  // ETA: a placeholder fixed clock for the harness (real ETA needs wall clock).
+  ov.eta = "5:42";
+  // Speed: placeholder constant for preview.
+  ov.speed = "34";
+  return ov;
+}
+
+// Render the perspective view + nav overlay at a given distance along the route
+// into `canvas`. Returns the number of centerline points used (0 => degenerate).
 static size_t RenderAt(GFXcanvas16& canvas, const nav::RouteSummary& route,
                        const std::vector<double>& cum, double distanceM) {
   nav::LatLng pos = posAtDistance(route, cum, distanceM);
@@ -106,6 +187,9 @@ static size_t RenderAt(GFXcanvas16& canvas, const nav::RouteSummary& route,
   }
   canvas.fillScreen(0x0000);
   display::DrawPerspective(&canvas, p);
+
+  display::NavOverlayProps ov = buildOverlay(route, cum, distanceM);
+  display::DrawNavOverlay(&canvas, ov);
   return local.size();
 }
 

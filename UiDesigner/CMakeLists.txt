@@ -32,6 +32,7 @@ add_library(display-shared
   ${DISPLAY_LIB}/src/gmeter_screen.cpp
   ${DISPLAY_LIB}/src/quarter_mile_screens.cpp
   ${DISPLAY_LIB}/src/perspective_screen.cpp
+  ${DISPLAY_LIB}/src/nav_overlay.cpp
   ${DISPLAY_LIB}/src/demo_screens.cpp
   # image_loader_spiffs.cpp is firmware-only; the desktop file-backed loader is
   # compiled into the executables below instead.
