@@ -176,6 +176,9 @@ export class StatusPage {
         this.fwVal.textContent = v || DASH;
         this.debugPanel.setFirmwareVersion(v);
       }),
+      conn.on('firmwareInfo', (info) => {
+        this.firmwarePanel.setDeviceInfo(info);
+      }),
       conn.on('log', ({ level, message }) => this.appendLog(level, message)),
       // errors are already logged via the 'log' event; swallow to avoid unhandled rejection
       conn.on('error', () => {}),

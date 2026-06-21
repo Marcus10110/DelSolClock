@@ -11,6 +11,15 @@ export interface ReleaseAsset {
   browserDownloadUrl: string;
 }
 
+/** Machine-readable metadata embedded in the release body (delsol-meta block). */
+export interface ReleaseMeta {
+  proto: number;
+  app?: string;
+  /** SHA-256 of the released spiffs.bin (hex) — compare to the device's fs hash. */
+  fsSha256: string;
+  fsSize?: number;
+}
+
 export interface Release {
   tagName: string;
   name: string;
@@ -18,8 +27,39 @@ export interface Release {
   htmlUrl: string;
   publishedAt: string;
   assets: ReleaseAsset[];
-  /** The first .bin asset, if any — what we flash. */
-  binaryAsset: ReleaseAsset | null;
+  /** The firmware app image asset (firmware.bin), if any. */
+  firmwareAsset: ReleaseAsset | null;
+  /** The SPIFFS image asset (spiffs.bin), if any. */
+  spiffsAsset: ReleaseAsset | null;
+  /** Parsed delsol-meta block from the body, or null (legacy / proto 1 release). */
+  meta: ReleaseMeta | null;
+}
+
+/**
+ * Extract the delsol-meta JSON from a release body. The block is an HTML comment
+ * so it's invisible on the rendered GitHub page:
+ *   <!-- delsol-meta
+ *   {"proto":2,"fsSha256":"...","fsSize":655360}
+ *   -->
+ * Returns null if absent or unparseable (treated as a legacy/proto-1 release).
+ */
+export function parseReleaseMeta(body: string): ReleaseMeta | null {
+  const match = body.match(/<!--\s*delsol-meta\s*([\s\S]*?)-->/);
+  if (!match) return null;
+  try {
+    const obj = JSON.parse(match[1].trim()) as Partial<ReleaseMeta>;
+    if (typeof obj.fsSha256 !== 'string' || typeof obj.proto !== 'number') {
+      return null;
+    }
+    return {
+      proto: obj.proto,
+      app: obj.app,
+      fsSha256: obj.fsSha256.toLowerCase(),
+      fsSize: obj.fsSize,
+    };
+  } catch {
+    return null;
+  }
 }
 
 interface GhAsset {
@@ -60,27 +100,50 @@ export async function fetchReleases(
         size: a.size,
         browserDownloadUrl: a.browser_download_url,
       }));
-      const binaryAsset =
-        assets.find((a) => a.name.toLowerCase().endsWith('.bin')) ?? null;
+      const byName = (name: string) =>
+        assets.find((a) => a.name.toLowerCase() === name) ?? null;
+      // firmware.bin specifically; fall back to the first non-spiffs .bin for
+      // older releases that named the app image differently.
+      const firmwareAsset =
+        byName('firmware.bin') ??
+        assets.find(
+          (a) =>
+            a.name.toLowerCase().endsWith('.bin') &&
+            a.name.toLowerCase() !== 'spiffs.bin',
+        ) ??
+        null;
+      const body = r.body || '';
       return {
         tagName: r.tag_name,
         name: r.name || r.tag_name,
-        body: r.body || '',
+        body,
         htmlUrl: r.html_url,
         publishedAt: r.published_at,
         assets,
-        binaryAsset,
+        firmwareAsset,
+        spiffsAsset: byName('spiffs.bin'),
+        meta: parseReleaseMeta(body),
       };
     })
-    .filter((r) => r.binaryAsset !== null);
+    .filter((r) => r.firmwareAsset !== null);
 }
 
-/** Download a firmware asset as raw bytes. */
-export async function downloadFirmware(asset: ReleaseAsset): Promise<Uint8Array> {
+/** Download an asset as raw bytes. */
+async function downloadAsset(asset: ReleaseAsset): Promise<Uint8Array> {
   const res = await fetch(asset.browserDownloadUrl);
   if (!res.ok) {
     throw new Error(`Download ${res.status}: ${res.statusText}`);
   }
   const buf = await res.arrayBuffer();
   return new Uint8Array(buf);
+}
+
+/** Download a firmware (app) image asset as raw bytes. */
+export function downloadFirmware(asset: ReleaseAsset): Promise<Uint8Array> {
+  return downloadAsset(asset);
+}
+
+/** Download a SPIFFS image asset as raw bytes. */
+export function downloadFilesystem(asset: ReleaseAsset): Promise<Uint8Array> {
+  return downloadAsset(asset);
 }

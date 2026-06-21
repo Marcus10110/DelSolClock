@@ -257,6 +257,30 @@ button:disabled {
   color: var(--on);
 }
 
+/* Filesystem (SPIFFS) status row within a release. */
+.fw-fs-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 2px;
+  flex-wrap: wrap;
+}
+.fw-fs-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+}
+.fw-fs-ok {
+  color: var(--on);
+}
+.fw-fs-diff {
+  color: var(--muted);
+}
+.fw-update-fs {
+  font-size: 13px;
+}
+
 .fw-progress-wrap {
   padding: 6px 0 4px;
 }

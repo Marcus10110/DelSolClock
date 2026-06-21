@@ -17,8 +17,16 @@ export const CHR_STATUS = '40d527f5-3204-44a2-a4ee-d8d3c16f970e'; // R/N  ASCII 
 export const CHR_BATTERY = '5c258bb8-91fc-43bb-8944-b83d0edc9b43'; // R/N  float32 little-endian (volts)
 
 // Firmware service characteristics
-export const CHR_FW_WRITE = '7efc013a-37b7-44da-8e1c-06e28256d83b'; // W-NR/N  512-byte OTA chunks; notifies continue/success/error
-export const CHR_FW_VERSION = 'a5c0d67a-9576-47ea-85c6-0347f8473cf3'; // R  ASCII version string
+export const CHR_FW_WRITE = '7efc013a-37b7-44da-8e1c-06e28256d83b'; // W-NR/N  see protocol below
+export const CHR_FW_VERSION = 'a5c0d67a-9576-47ea-85c6-0347f8473cf3'; // R  ASCII "proto=N;app=...;fs=..." (proto>=2) or bare version (proto 1)
+
+// Update protocol (proto >= 2): an upload begins with a 5-byte header packet
+// [command:1][totalSize:4 LE], then streams the image in 512-byte chunks; the
+// device acks each with continue/success/error. proto 1 devices have no header
+// and only accept an app image.
+export const FW_CMD_WRITE_APP = 0x01;
+export const FW_CMD_WRITE_SPIFFS = 0x02;
+export const FW_HEADER_SIZE = 5;
 
 // Debug service characteristics
 export const CHR_DEBUG_STATUS = '32a18dc5-fdda-4601-b5b7-dc2920ac3f37'; // R   "NOCRASH" | "CRASH:<bytes>:<chunks>"

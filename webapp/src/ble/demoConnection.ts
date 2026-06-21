@@ -15,6 +15,10 @@ import type { UploadProgress } from '../navigation/routeUpload';
 import type { RouteSummary } from '../navigation/types';
 
 const DEMO_FW_VERSION = 'demo-1.0.0';
+// A plausible-looking SPIFFS hash so the firmware panel's match UI has something
+// to compare against in demo mode.
+const DEMO_FS_HASH =
+  '23533c94e92f95de06fc347caedebf11148a924125d6ecc47eee081e5d3793cf';
 
 // A scripted "drive": a few states it cycles through every tick so we can watch
 // each flag and timestamp update on screen.
@@ -49,6 +53,11 @@ export class DemoConnection extends Emitter<ConnectionEvents> implements IConnec
     await delay(400);
 
     this.emit('firmwareVersion', DEMO_FW_VERSION);
+    this.emit('firmwareInfo', {
+      proto: 2,
+      appVersion: DEMO_FW_VERSION,
+      fsHash: DEMO_FS_HASH,
+    });
     this.log('ok', `Firmware version: ${DEMO_FW_VERSION}`);
 
     this.setState('connected');
@@ -66,20 +75,36 @@ export class DemoConnection extends Emitter<ConnectionEvents> implements IConnec
   }
 
   /** Simulate a firmware flash: step the progress bar through to 100%. */
-  async updateFirmware(
+  updateFirmware(
+    data: Uint8Array,
+    onProgress: (p: FirmwareUpdateProgress) => void,
+  ): Promise<boolean> {
+    return this.simulateFlash('firmware', data, onProgress);
+  }
+
+  /** Simulate a filesystem flash. */
+  updateFilesystem(
+    data: Uint8Array,
+    onProgress: (p: FirmwareUpdateProgress) => void,
+  ): Promise<boolean> {
+    return this.simulateFlash('filesystem', data, onProgress);
+  }
+
+  private async simulateFlash(
+    label: string,
     data: Uint8Array,
     onProgress: (p: FirmwareUpdateProgress) => void,
   ): Promise<boolean> {
     const totalChunks = Math.max(1, Math.ceil(data.length / 512));
-    this.log('info', `Demo flash: ${data.length} bytes, ${totalChunks} chunks.`);
-    onProgress({ percent: 10, message: `Uploading firmware (${data.length} bytes)…` });
+    this.log('info', `Demo ${label} flash: ${data.length} bytes, ${totalChunks} chunks.`);
+    onProgress({ percent: 10, message: `Uploading ${label} (${data.length} bytes)…` });
     for (let i = 0; i < totalChunks; i++) {
       await delay(40);
       const percent = 10 + Math.round(((i + 1) * 85) / totalChunks);
       onProgress({ percent, message: `Uploading… ${i + 1}/${totalChunks} chunks` });
     }
     onProgress({ percent: 100, message: 'Update completed successfully.' });
-    this.log('ok', 'Demo flash complete.');
+    this.log('ok', `Demo ${label} flash complete.`);
     return true;
   }
 

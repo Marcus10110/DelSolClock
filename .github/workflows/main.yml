@@ -39,12 +39,38 @@ jobs:
           mkdir output
           cd firmware
           pio run
+          pio run -t buildfs
           cp .pio/build/featheresp32/firmware.bin ../output/firmware.bin
           cp .pio/build/featheresp32/firmware.elf ../output/firmware.elf
+          cp .pio/build/featheresp32/spiffs.bin ../output/spiffs.bin
+
+      # Build the machine-readable metadata block that the web app reads out of
+      # the release body (no extra per-release download). The fs hash must match
+      # the device-side sha256 of the raw SPIFFS partition.
+      - name: Build release metadata
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          FS_SHA=$(sha256sum output/spiffs.bin | awk '{print $1}')
+          FS_SIZE=$(stat -c%s output/spiffs.bin)
+          BRANCH_OR_TAG=${GITHUB_REF#refs/*/}
+          {
+            echo "Del Sol Clock firmware ${BRANCH_OR_TAG}."
+            echo ""
+            echo "<!-- delsol-meta"
+            echo "{\"proto\":2,\"app\":\"${BRANCH_OR_TAG}\",\"fsSha256\":\"${FS_SHA}\",\"fsSize\":${FS_SIZE}}"
+            echo "-->"
+          } > output/release_body.md
+          echo "Release body:"
+          cat output/release_body.md
 
       # publish tags as releases.
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: output/*
+          # firmware.elf is for debugging; the web app reads firmware.bin + spiffs.bin.
+          files: |
+            output/firmware.bin
+            output/firmware.elf
+            output/spiffs.bin
+          body_path: output/release_body.md

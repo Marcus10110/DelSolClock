@@ -3,6 +3,7 @@
 // identically whether or not a real device is present.
 
 import type { Emitter } from './emitter';
+import type { FirmwareInfo } from './parsers';
 import type { BatteryStatus, ConnectionState, VehicleStatus } from './types';
 import type { RouteSummary } from '../navigation/types';
 import type { UploadProgress } from '../navigation/routeUpload';
@@ -11,7 +12,10 @@ export interface ConnectionEvents {
   state: ConnectionState;
   status: VehicleStatus;
   battery: BatteryStatus;
+  /** Legacy: the app version string only. Kept for existing listeners. */
   firmwareVersion: string;
+  /** Full parsed firmware info: protocol, app version, SPIFFS hash. */
+  firmwareInfo: FirmwareInfo;
   /** Human-readable log lines for the on-screen log / debugging. */
   log: { level: 'info' | 'ok' | 'error' | 'rx'; message: string };
   error: Error;
@@ -44,10 +48,19 @@ export interface IConnection extends Emitter<ConnectionEvents> {
   connect(): Promise<void>;
   disconnect(): void;
   /**
-   * Flash a firmware image over BLE. Resolves true on success.
+   * Flash the app firmware image over BLE. Resolves true on success.
    * Reports progress via the callback. Must be connected.
    */
   updateFirmware(
+    data: Uint8Array,
+    onProgress: (p: FirmwareUpdateProgress) => void,
+  ): Promise<boolean>;
+
+  /**
+   * Flash the SPIFFS filesystem image over BLE. Resolves true on success; the
+   * device reboots afterward. Requires a proto >= 2 device. Reports progress.
+   */
+  updateFilesystem(
     data: Uint8Array,
     onProgress: (p: FirmwareUpdateProgress) => void,
   ): Promise<boolean>;

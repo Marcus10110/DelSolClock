@@ -15,6 +15,9 @@ import {
   CHR_FW_WRITE,
   CHR_STATUS,
   FIRMWARE_CHUNK_SIZE,
+  FW_CMD_WRITE_APP,
+  FW_CMD_WRITE_SPIFFS,
+  FW_HEADER_SIZE,
   OTA_NOTIFY_TIMEOUT_MS,
   SVC_DEBUG,
   SVC_FIRMWARE,
@@ -44,6 +47,8 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
   private statusChar: BluetoothRemoteGATTCharacteristic | null = null;
   private batteryChar: BluetoothRemoteGATTCharacteristic | null = null;
   private _state: ConnectionState = 'disconnected';
+  /** Protocol version of the connected device (1 = legacy, app-only). */
+  private proto = 1;
 
   private readonly onStatusValue = (e: Event) => {
     const char = e.target as BluetoothRemoteGATTCharacteristic;
@@ -237,9 +242,16 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     const svc = await this.server.getPrimaryService(SVC_FIRMWARE);
     const chr = await svc.getCharacteristic(CHR_FW_VERSION);
     const value = await chr.readValue();
-    const version = parseFirmwareVersion(value);
-    this.log('ok', `Firmware version: ${version}`);
-    this.emit('firmwareVersion', version);
+    const info = parseFirmwareVersion(value);
+    this.proto = info.proto;
+    this.log(
+      'ok',
+      `Firmware: ${info.appVersion} (proto ${info.proto}` +
+        (info.fsHash ? `, fs ${info.fsHash.slice(0, 12)}…` : '') +
+        ')',
+    );
+    this.emit('firmwareVersion', info.appVersion);
+    this.emit('firmwareInfo', info);
   }
 
   /** Subscribe to vehicle status + battery notifications and prime current values. */
@@ -264,21 +276,50 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     this.log('ok', 'Subscribed to battery notifications.');
   }
 
+  /** Flash the app firmware image over BLE. */
+  updateFirmware(
+    data: Uint8Array,
+    onProgress: (p: FirmwareUpdateProgress) => void,
+  ): Promise<boolean> {
+    return this.streamImage('app', data, onProgress);
+  }
+
+  /** Flash the SPIFFS filesystem image over BLE. Requires a proto >= 2 device. */
+  updateFilesystem(
+    data: Uint8Array,
+    onProgress: (p: FirmwareUpdateProgress) => void,
+  ): Promise<boolean> {
+    if (this.proto < 2) {
+      return Promise.reject(
+        new Error('This device’s firmware does not support filesystem updates.'),
+      );
+    }
+    return this.streamImage('fs', data, onProgress);
+  }
+
   /**
-   * Flash a firmware image over BLE. Ported from DelSolDevice.UpdateFirmwareAsync.
+   * Stream an image (app or filesystem) to the device over BLE.
    * Protocol (firmware ble_ota.cpp):
-   *  - write the image in 512-byte chunks to the FW write characteristic
-   *  - after each chunk, the device notifies "continue" | "success" | "error"
+   *  - proto >= 2: first send a 5-byte header [command:1][totalSize:4 LE] and
+   *    wait for "continue", then stream the image.
+   *  - proto 1: app only, NO header — start streaming immediately (legacy path).
+   *  - write the image in 512-byte chunks; the device acks each chunk with
+   *    "continue" | "success" | "error".
    *  - a final chunk shorter than 512 bytes signals end-of-stream; if the image
    *    is an exact multiple of 512, send a zero-length final write.
    */
-  async updateFirmware(
+  private async streamImage(
+    target: 'app' | 'fs',
     data: Uint8Array,
     onProgress: (p: FirmwareUpdateProgress) => void,
   ): Promise<boolean> {
     if (!this.server) throw new Error('Not connected.');
+    if (target === 'fs' && this.proto < 2) {
+      throw new Error('Filesystem updates require proto >= 2 firmware.');
+    }
 
-    onProgress({ percent: 5, message: 'Preparing firmware update…' });
+    const label = target === 'fs' ? 'filesystem' : 'firmware';
+    onProgress({ percent: 5, message: `Preparing ${label} update…` });
     const svc = await this.server.getPrimaryService(SVC_FIRMWARE);
     const writeChar = await svc.getCharacteristic(CHR_FW_WRITE);
 
@@ -309,8 +350,27 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
       const total = data.length;
       const totalChunks = Math.ceil(total / FIRMWARE_CHUNK_SIZE);
       const needsZeroLengthChunk = total % FIRMWARE_CHUNK_SIZE === 0;
-      this.log('info', `Uploading firmware: ${total} bytes, ${totalChunks} chunks.`);
-      onProgress({ percent: 10, message: `Uploading firmware (${total} bytes)…` });
+
+      // proto >= 2: send the 5-byte header [command:1][totalSize:4 LE] first and
+      // wait for the device to ack before streaming. proto 1 devices have no
+      // header and only accept an app image (legacy behavior).
+      if (this.proto >= 2) {
+        const command = target === 'fs' ? FW_CMD_WRITE_SPIFFS : FW_CMD_WRITE_APP;
+        const header = new Uint8Array(FW_HEADER_SIZE);
+        header[0] = command;
+        new DataView(header.buffer).setUint32(1, total, /* littleEndian */ true);
+        const ack = waitForAck();
+        await writeChar.writeValueWithoutResponse(header);
+        const response = await ack;
+        if (response === 'error') {
+          this.log('error', `Device rejected the ${label} update header.`);
+          onProgress({ percent: 0, message: 'Device rejected the update.' });
+          return false;
+        }
+      }
+
+      this.log('info', `Uploading ${label}: ${total} bytes, ${totalChunks} chunks.`);
+      onProgress({ percent: 10, message: `Uploading ${label} (${total} bytes)…` });
 
       for (let i = 0; i < totalChunks; i++) {
         const offset = i * FIRMWARE_CHUNK_SIZE;
@@ -322,12 +382,12 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
         const response = await ack;
 
         if (response === 'error') {
-          this.log('error', `Firmware update failed at chunk ${i + 1}.`);
+          this.log('error', `${cap(label)} update failed at chunk ${i + 1}.`);
           onProgress({ percent: 0, message: `Update failed at chunk ${i + 1}.` });
           return false;
         }
         if (response === 'success') {
-          this.log('ok', 'Firmware update completed successfully.');
+          this.log('ok', `${cap(label)} update completed successfully.`);
           onProgress({ percent: 100, message: 'Update completed successfully.' });
           return true;
         }
@@ -473,6 +533,11 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
   private log(level: ConnectionEvents['log']['level'], message: string): void {
     this.emit('log', { level, message });
   }
+}
+
+/** Capitalize the first letter (for log messages). */
+function cap(s: string): string {
+  return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
 /** Reject if `p` doesn't settle within `ms`. */

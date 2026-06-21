@@ -3,7 +3,9 @@
 // hands it the active IConnection (real or demo) when connected.
 
 import type { IConnection } from '../ble/iconnection';
+import type { FirmwareInfo } from '../ble/parsers';
 import {
+  downloadFilesystem,
   downloadFirmware,
   fetchReleases,
   type Release,
@@ -14,6 +16,8 @@ export class FirmwarePanel {
   private conn: IConnection | null = null;
   private releases: Release[] = [];
   private busy = false;
+  /** Device firmware info (proto + current SPIFFS hash), once connected. */
+  private deviceInfo: FirmwareInfo | null = null;
 
   constructor() {
     this.el = document.createElement('div');
@@ -27,8 +31,16 @@ export class FirmwarePanel {
     if (!conn) {
       this.releases = [];
       this.busy = false;
+      this.deviceInfo = null;
       this.renderIdle();
     }
+  }
+
+  /** Called by StatusPage when the device reports its firmware/SPIFFS info. */
+  setDeviceInfo(info: FirmwareInfo): void {
+    this.deviceInfo = info;
+    // Re-render the list (if shown) so FS match badges reflect the device hash.
+    if (this.releases.length > 0 && !this.busy) this.renderReleases();
   }
 
   private renderIdle(): void {
@@ -69,13 +81,30 @@ export class FirmwarePanel {
       return;
     }
 
+    const deviceFsHash = this.deviceInfo?.fsHash ?? null;
+    const deviceSupportsFs = (this.deviceInfo?.proto ?? 1) >= 2;
+
     list.innerHTML = this.releases
       .map((r, i) => {
-        const size = r.binaryAsset ? formatBytes(r.binaryAsset.size) : '';
+        const size = r.firmwareAsset ? formatBytes(r.firmwareAsset.size) : '';
         const date = formatDate(r.publishedAt);
-        const notes = r.body.trim()
-          ? `<details class="fw-notes"><summary>Release notes</summary><pre>${escapeHtml(r.body.trim())}</pre></details>`
-          : '';
+        const notes = renderNotes(r.body);
+
+        // Filesystem status: compare the release's published hash to the device's.
+        // Only meaningful when both the device (proto>=2) and the release expose one.
+        let fsRow = '';
+        if (deviceSupportsFs && r.spiffsAsset && r.meta?.fsSha256) {
+          const matches =
+            deviceFsHash !== null &&
+            deviceFsHash.toLowerCase() === r.meta.fsSha256.toLowerCase();
+          fsRow = matches
+            ? `<div class="fw-fs-row"><span class="fw-fs-badge fw-fs-ok">✓ Filesystem up to date</span></div>`
+            : `<div class="fw-fs-row">
+                 <span class="fw-fs-badge fw-fs-diff">Filesystem differs</span>
+                 <button class="fw-update-fs" data-index="${i}">Update filesystem</button>
+               </div>`;
+        }
+
         return `
           <div class="fw-release" data-index="${i}">
             <div class="fw-release-head">
@@ -85,6 +114,7 @@ export class FirmwarePanel {
               </div>
               <button class="fw-update" data-index="${i}">Update</button>
             </div>
+            ${fsRow}
             ${notes}
             ${githubLink(r.htmlUrl)}
           </div>`;
@@ -97,19 +127,71 @@ export class FirmwarePanel {
         void this.runUpdate(this.releases[idx]);
       });
     }
+    for (const btn of list.querySelectorAll<HTMLButtonElement>('.fw-update-fs')) {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.index);
+        void this.runFilesystemUpdate(this.releases[idx]);
+      });
+    }
   }
 
-  private async runUpdate(release: Release): Promise<void> {
+  private runUpdate(release: Release): Promise<void> {
+    if (!release.firmwareAsset) return Promise.resolve();
+    return this.runFlash({
+      kind: 'firmware',
+      asset: release.firmwareAsset,
+      releaseName: release.name,
+      confirmExtra: '',
+      download: downloadFirmware,
+      flash: (data, onProgress) => this.conn!.updateFirmware(data, onProgress),
+    });
+  }
+
+  private runFilesystemUpdate(release: Release): Promise<void> {
+    if (!release.spiffsAsset) return Promise.resolve();
+    if ((this.deviceInfo?.proto ?? 1) < 2) {
+      alert('This device’s firmware does not support filesystem updates.');
+      return Promise.resolve();
+    }
+    return this.runFlash({
+      kind: 'filesystem',
+      asset: release.spiffsAsset,
+      releaseName: release.name,
+      // Filesystem writes have no rollback (single partition) — warn explicitly.
+      confirmExtra:
+        '\n\nThis replaces the device filesystem and cannot be rolled back. ' +
+        'If interrupted, the filesystem may be left invalid until re-flashed.',
+      download: downloadFilesystem,
+      flash: (data, onProgress) => this.conn!.updateFilesystem(data, onProgress),
+    });
+  }
+
+  /** Shared download-then-flash flow used by both firmware and filesystem updates. */
+  private async runFlash(opts: {
+    kind: 'firmware' | 'filesystem';
+    asset: { name: string; size: number; browserDownloadUrl: string };
+    releaseName: string;
+    confirmExtra: string;
+    download: (asset: {
+      name: string;
+      size: number;
+      browserDownloadUrl: string;
+    }) => Promise<Uint8Array>;
+    flash: (
+      data: Uint8Array,
+      onProgress: (p: { percent: number; message: string }) => void,
+    ) => Promise<boolean>;
+  }): Promise<void> {
     if (this.busy) return;
     if (!this.conn || !this.conn.isConnected) {
-      alert('Connect to the device before updating firmware.');
+      alert(`Connect to the device before updating the ${opts.kind}.`);
       return;
     }
-    if (!release.binaryAsset) return;
 
     const ok = confirm(
-      `Flash "${release.name}" (${formatBytes(release.binaryAsset.size)}) to the device?\n\n` +
-        `Do not close this page or move out of range during the update.`,
+      `Flash the ${opts.kind} from "${opts.releaseName}" (${formatBytes(opts.asset.size)}) to the device?\n\n` +
+        `Do not close this page or move out of range during the update.` +
+        opts.confirmExtra,
     );
     if (!ok) return;
 
@@ -127,10 +209,10 @@ export class FirmwarePanel {
     const pctEl = this.el.querySelector('#fw-pct') as HTMLElement;
 
     try {
-      msgEl.textContent = 'Downloading firmware…';
-      const data = await downloadFirmware(release.binaryAsset);
+      msgEl.textContent = `Downloading ${opts.kind}…`;
+      const data = await opts.download(opts.asset);
 
-      const success = await this.conn.updateFirmware(data, (p) => {
+      const success = await opts.flash(data, (p) => {
         fillEl.style.width = `${p.percent}%`;
         pctEl.textContent = `${p.percent}%`;
         msgEl.textContent = p.message;
@@ -153,6 +235,16 @@ export class FirmwarePanel {
       list.appendChild(again);
     }
   }
+}
+
+/**
+ * Render release notes, stripping the machine-readable delsol-meta block so it
+ * doesn't show up in the human-facing notes.
+ */
+function renderNotes(body: string): string {
+  const cleaned = body.replace(/<!--\s*delsol-meta[\s\S]*?-->/g, '').trim();
+  if (!cleaned) return '';
+  return `<details class="fw-notes"><summary>Release notes</summary><pre>${escapeHtml(cleaned)}</pre></details>`;
 }
 
 function formatBytes(n: number): string {

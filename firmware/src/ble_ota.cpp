@@ -11,6 +11,7 @@
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
 #include "mbedtls/sha256.h"
+#include <Update.h>
 
 #define FIRMWARE_UPDATE_SERVICE_UUID "69da0f2b-43a4-4c2a-b01d-0f11564c732b"
 #define FIRMWARE_UPDATE_WRITE_CHARACTERISTIC_UUID "7efc013a-37b7-44da-8e1c-06e28256d83b"
@@ -21,6 +22,24 @@ namespace BleOta
 {
     namespace
     {
+        // Protocol version reported in the version characteristic. Bump when the
+        // wire format (header packet / commands / version-string layout) changes.
+        constexpr int ProtocolVersion = 2;
+
+        // First-packet command bytes (the 5-byte header is [command:1][total_size:4 LE]).
+        constexpr uint8_t CmdWriteApp = 0x01;
+        constexpr uint8_t CmdWriteSpiffs = 0x02;
+        // 0x03 = cancel — reserved, not implemented in protocol 2.
+
+        constexpr size_t HeaderSize = 5;
+
+        enum class Target
+        {
+            None,
+            App,
+            Spiffs,
+        };
+
         esp_ota_handle_t UpdateHandle = 0;
 
         uint32_t PacketsReceived{ 0 };
@@ -31,55 +50,210 @@ namespace BleOta
 
         // cross thread data
         std::mutex Mutex;
-        uint32_t BytesReceived{ 0 };
+        uint32_t BytesReceived{ 0 }; // image bytes received so far (excludes the header)
         bool RebootRequired{ false };
         uint32_t RebootMinTimeMs{ 0 };
+
+        // Per-upload state. Set from the header packet; reset when an upload
+        // begins, completes, or errors. Touched only on the BLE callback thread.
+        Target CurrentTarget{ Target::None };
+        uint32_t DeclaredSize{ 0 };
+
+        // Tear down any in-flight upload handle so the next one starts clean.
+        // (App OTA reboots on success, but FS OTA could be retried, and a failed
+        // upload must not strand a half-open handle.)
+        void AbortInFlight()
+        {
+            if( CurrentTarget == Target::App && UpdateHandle != 0 )
+            {
+                esp_ota_abort( UpdateHandle );
+            }
+            else if( CurrentTarget == Target::Spiffs && Update.isRunning() )
+            {
+                Update.abort();
+            }
+            UpdateHandle = 0;
+            CurrentTarget = Target::None;
+            DeclaredSize = 0;
+        }
+
+        void ResetUploadState()
+        {
+            std::scoped_lock lock( Mutex );
+            BytesReceived = 0;
+            PacketsReceived = 0;
+            FirstPacketTimeMs = 0;
+            LastPacketTimeMs = 0;
+        }
+
+        // Begin a new upload from a parsed header. Returns true on success.
+        bool BeginUpload( uint8_t command, uint32_t total_size )
+        {
+            AbortInFlight(); // clean slate, even mid-way through a prior upload.
+            ResetUploadState();
+
+            if( command == CmdWriteApp )
+            {
+                esp_err_t status = esp_ota_begin( esp_ota_get_next_update_partition( NULL ),
+                                                  total_size > 0 ? total_size : OTA_SIZE_UNKNOWN, &UpdateHandle );
+                if( status != ESP_OK )
+                {
+                    LOG_ERROR( "esp_ota_begin failed: %i", status );
+                    return false;
+                }
+                CurrentTarget = Target::App;
+                DeclaredSize = total_size;
+                LOG_TRACE( "BeginUpload: app, %u bytes", total_size );
+                return true;
+            }
+            if( command == CmdWriteSpiffs )
+            {
+                // U_SPIFFS targets the SPIFFS data partition. Update wants a size;
+                // the declared total is the (full, padded) image size.
+                if( !Update.begin( total_size, U_SPIFFS ) )
+                {
+                    LOG_ERROR( "Update.begin(U_SPIFFS) failed: %i", Update.getError() );
+                    return false;
+                }
+                CurrentTarget = Target::Spiffs;
+                DeclaredSize = total_size;
+                LOG_TRACE( "BeginUpload: spiffs, %u bytes", total_size );
+                return true;
+            }
+
+            LOG_ERROR( "BeginUpload: unsupported command 0x%02x", command );
+            return false;
+        }
+
+        // Write a chunk of image data to the in-flight target. Returns true on success.
+        bool WriteChunk( const uint8_t* data, size_t length )
+        {
+            if( length == 0 )
+            {
+                return true;
+            }
+            if( CurrentTarget == Target::App )
+            {
+                esp_err_t status = esp_ota_write( UpdateHandle, data, length );
+                if( status != ESP_OK )
+                {
+                    LOG_ERROR( "esp_ota_write: %i", status );
+                    return false;
+                }
+                return true;
+            }
+            if( CurrentTarget == Target::Spiffs )
+            {
+                if( Update.write( const_cast<uint8_t*>( data ), length ) != length )
+                {
+                    LOG_ERROR( "Update.write failed: %i", Update.getError() );
+                    return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // Finalize the in-flight upload. Returns true on success; on app success
+        // also sets the boot partition. The caller handles the reboot.
+        bool FinishUpload()
+        {
+            if( CurrentTarget == Target::App )
+            {
+                esp_err_t status = esp_ota_end( UpdateHandle );
+                UpdateHandle = 0;
+                if( status != ESP_OK )
+                {
+                    LOG_ERROR( "esp_ota_end error: %i", status );
+                    CurrentTarget = Target::None;
+                    return false;
+                }
+                status = esp_ota_set_boot_partition( esp_ota_get_next_update_partition( NULL ) );
+                LOG_TRACE( "esp_ota_set_boot_partition: %i", status );
+                CurrentTarget = Target::None;
+                return status == ESP_OK;
+            }
+            if( CurrentTarget == Target::Spiffs )
+            {
+                bool ok = Update.end( true ); // true = the declared size was fully written
+                if( !ok )
+                {
+                    LOG_ERROR( "Update.end(U_SPIFFS) error: %i", Update.getError() );
+                }
+                CurrentTarget = Target::None;
+                return ok;
+            }
+            return false;
+        }
+
         class OtaWriteCallbacks : public BLECharacteristicCallbacks
         {
           public:
             void onWrite( BLECharacteristic* characteristic ) override
             {
                 auto start_time = millis();
-                esp_err_t status;
                 std::string rxData = characteristic->getValue();
+                const uint8_t* bytes = reinterpret_cast<const uint8_t*>( rxData.data() );
 
-                uint32_t bytes_received = 0;
+                bool is_first_packet;
                 {
                     std::scoped_lock lock( Mutex );
-                    if( BytesReceived == 0 )
+                    is_first_packet = ( BytesReceived == 0 && CurrentTarget == Target::None );
+                }
+
+                // The first packet of an upload is a 5-byte header: [command][size LE].
+                if( is_first_packet )
+                {
+                    if( rxData.length() < HeaderSize )
                     {
-                        LOG_TRACE( "BeginOTA" );
+                        LOG_ERROR( "OTA header too short: %u bytes", ( unsigned )rxData.length() );
+                        NotifyError( characteristic );
+                        return;
+                    }
+                    uint8_t command = bytes[ 0 ];
+                    uint32_t total_size = static_cast<uint32_t>( bytes[ 1 ] ) | ( static_cast<uint32_t>( bytes[ 2 ] ) << 8 ) |
+                                          ( static_cast<uint32_t>( bytes[ 3 ] ) << 16 ) | ( static_cast<uint32_t>( bytes[ 4 ] ) << 24 );
+
+                    {
+                        std::scoped_lock lock( Mutex );
                         FirstPacketTimeMs = millis();
                     }
+
+                    if( !BeginUpload( command, total_size ) )
+                    {
+                        NotifyError( characteristic );
+                        return;
+                    }
+                    // Header consumed; ack and wait for the first data chunk.
+                    characteristic->setValue( "continue" );
+                    characteristic->notify();
+                    return;
+                }
+
+                // Subsequent packets are image data.
+                if( !WriteChunk( bytes, rxData.length() ) )
+                {
+                    NotifyError( characteristic );
+                    return;
+                }
+
+                uint32_t bytes_received;
+                {
+                    std::scoped_lock lock( Mutex );
                     BytesReceived += rxData.length();
                     bytes_received = BytesReceived;
                 }
 
-
-                if( rxData.length() > 0 )
+                // End of stream: a short/zero final chunk, or the declared size reached.
+                bool size_reached = ( DeclaredSize > 0 && bytes_received >= DeclaredSize );
+                bool short_chunk = ( rxData.length() != FullOtaPacketSize );
+                if( short_chunk || size_reached )
                 {
-                    status = esp_ota_write( UpdateHandle, rxData.c_str(), rxData.length() );
-                    if( status != ESP_OK )
+                    LOG_TRACE( "EndOTA (%u bytes)", bytes_received );
+                    if( FinishUpload() )
                     {
-                        LOG_ERROR( "esp_ota_write: %i", status );
-                        // TODO handle error;
-                    }
-                }
-                auto write_time = millis() - start_time;
-                if( rxData.length() != FullOtaPacketSize && bytes_received > 0 )
-                {
-                    LOG_TRACE( "EndOTA" );
-                    status = esp_ota_end( UpdateHandle );
-                    if( status != ESP_OK )
-                    {
-                        LOG_ERROR( "esp_ota_end error: %i", status );
-                        // TODO handle error;
-                    }
-                    status = esp_ota_set_boot_partition( esp_ota_get_next_update_partition( NULL ) );
-                    LOG_TRACE( "esp_ota_set_boot_partition: %i", status );
-                    if( status == ESP_OK )
-                    {
-                        // the PC never gets this. I think we need to return from this callback before we reboot the device.
+                        // The PC never gets this if we reboot synchronously, so we
+                        // defer the reboot (below) until after this callback returns.
                         characteristic->setValue( "success" );
                         characteristic->notify();
                         LOG_TRACE( "notified success" );
@@ -91,18 +265,9 @@ namespace BleOta
                         }
                         return;
                     }
-                    else
-                    {
-                        {
-                            std::scoped_lock lock( Mutex );
-                            BytesReceived = 0;
-                        }
-                        LOG_ERROR( "Upload Error" );
-                        characteristic->setValue( "error" );
-                        characteristic->notify();
-                        LOG_TRACE( "notified error" );
-                        return;
-                    }
+                    LOG_ERROR( "Upload finalize error" );
+                    NotifyError( characteristic );
+                    return;
                 }
 
                 characteristic->setValue( "continue" );
@@ -121,18 +286,26 @@ namespace BleOta
                 float ms_per_cycle = static_cast<float>( total_time ) / PacketsReceived;
                 LOG_TRACE( "OTA %ims/%ims/%ims %1.1f %u B", cycle_time, packet_time, total_time, ms_per_cycle, bytes_received );
             }
+
+          private:
+            // Notify the host of an error and reset to a clean idle state so a
+            // retry (without rebooting) starts fresh.
+            void NotifyError( BLECharacteristic* characteristic )
+            {
+                AbortInFlight();
+                ResetUploadState();
+                characteristic->setValue( "error" );
+                characteristic->notify();
+                LOG_TRACE( "notified error" );
+            }
         };
     }
     void Begin( BLEServer* server )
     {
         LOG_TRACE( "Starting OTA service" );
         PRINT_MEMORY_USAGE();
-        auto status = esp_ota_begin( esp_ota_get_next_update_partition( NULL ), OTA_SIZE_UNKNOWN, &UpdateHandle );
-        LOG_TRACE( "esp_ota_begin: %i", status );
-        if( status != ESP_OK )
-        {
-            return;
-        }
+        // Note: the OTA target (app vs. SPIFFS) is now selected per-upload from the
+        // first packet's header, so we no longer call esp_ota_begin() here.
         auto service = server->createService( FIRMWARE_UPDATE_SERVICE_UUID );
         auto write_characteristic = service->createCharacteristic(
             FIRMWARE_UPDATE_WRITE_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_WRITE_NR );
@@ -141,9 +314,15 @@ namespace BleOta
             service->createCharacteristic( FIRMWARE_UPDATE_VERSION_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ );
         write_characteristic->addDescriptor( new BLE2902() );
 
-        version_characteristic->setValue( VERSION );
+        // Version string: "proto=<n>;app=<version>;fs=<spiffs-hash>". A reader that
+        // sees no "proto" field is talking to old (protocol 1) firmware.
+        uint32_t hash_ms = 0;
+        std::string fs_hash = HashSpiffsPartition( &hash_ms );
+        std::string version_value =
+            "proto=" + std::to_string( ProtocolVersion ) + ";app=" + std::string( VERSION ) + ";fs=" + fs_hash;
+        version_characteristic->setValue( version_value );
         service->start();
-        LOG_TRACE( "Started OTA service. Current version: %s", VERSION );
+        LOG_TRACE( "Started OTA service. Version: %s (fs hash in %u ms)", version_value.c_str(), hash_ms );
         PRINT_MEMORY_USAGE();
     }
 
