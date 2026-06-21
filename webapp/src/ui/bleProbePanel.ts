@@ -209,13 +209,22 @@ export class BleProbePanel {
       this.log('info', 'No known devices to forget.');
       return;
     }
+    // device.forget() isn't implemented on Bluefy/iOS. Check once up front rather
+    // than logging the same warning per device.
+    const supportsForget =
+      devices.length > 0 &&
+      typeof (devices[0] as { forget?: unknown }).forget === 'function';
+    if (!supportsForget) {
+      this.log('warn',
+        `forget() not supported in this browser — ${devices.length} handle(s) left in place.`);
+      this.log('info',
+        'Not a problem: Reconnect tries each known handle and skips dead ones. ' +
+        'To truly clear a stale pairing, use iOS Settings ▸ Bluetooth ▸ Del Sol ▸ Forget.');
+      return;
+    }
     let forgotten = 0;
     for (const d of devices) {
-      const dev = d as BluetoothDevice & { forget?: () => Promise<void> };
-      if (typeof dev.forget !== 'function') {
-        this.log('warn', `forget() not supported — "${d.name ?? d.id}" left in place.`);
-        continue;
-      }
+      const dev = d as BluetoothDevice & { forget: () => Promise<void> };
       try {
         await dev.forget();
         forgotten++;
