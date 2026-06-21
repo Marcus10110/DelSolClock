@@ -13,6 +13,7 @@ import type {
   VehicleStatus,
 } from '../ble/types';
 import { FirmwarePanel } from './firmwarePanel';
+import { warmupApi } from '../firmware/firmwareBrowser';
 import { DebugPanel } from './debugPanel';
 import { NavigationPanel } from './navigationPanel';
 import { BleProbePanel } from './bleProbePanel';
@@ -156,6 +157,9 @@ export class StatusPage {
     for (const node of this.el.querySelectorAll<HTMLElement>('[data-flag]')) {
       this.flagEls[node.dataset.flag as string] = node;
     }
+    // Route the firmware panel's diagnostics to the on-screen log (Bluefy has no
+    // dev console), so update download/flash failures are visible on-device.
+    this.firmwarePanel.setLogger((level, message) => this.appendLog(level, message));
   }
 
   private wireEvents(): void {
@@ -169,7 +173,12 @@ export class StatusPage {
   private useConnection(conn: IConnection): void {
     this.unsubscribers.forEach((off) => off());
     this.unsubscribers = [
-      conn.on('state', (s) => this.render(s)),
+      conn.on('state', (s) => {
+        this.render(s);
+        // A connection is a strong signal an update may follow — warm the API
+        // again so it's ready by the time the user clicks Update.
+        if (s === 'connected') warmupApi();
+      }),
       conn.on('status', (s) => this.renderStatus(s)),
       conn.on('battery', (b) => this.renderBattery(b)),
       conn.on('firmwareVersion', (v) => {

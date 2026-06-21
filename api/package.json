@@ -1,0 +1,16 @@
+{
+  "name": "delsol-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Del Sol Clock backend API. Currently a CORS proxy for GitHub release-asset downloads (firmware.bin / spiffs.bin) — the static frontend can't read GitHub's CDN responses directly (no CORS header on the final asset response), so this service fetches them server-side and re-serves with CORS. May host other backend needs over time.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

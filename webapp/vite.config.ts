@@ -14,8 +14,10 @@ const CSP = [
   "font-src 'self'",
   "manifest-src 'self'",
   "worker-src 'self'",
-  // fetch targets: GitHub API + release downloads + Mapbox search/directions.
-  "connect-src 'self' https://api.github.com https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://api.mapbox.com",
+  // fetch targets: GitHub API (release list) + asset-download proxy + Mapbox.
+  // Asset binaries are fetched via the proxy (GitHub's CDN has no CORS); keep
+  // this in sync with render.yaml's connect-src.
+  "connect-src 'self' https://api.github.com https://delsolapi.markgarrison.io https://api.mapbox.com",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",

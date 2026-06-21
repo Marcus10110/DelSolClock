@@ -29,7 +29,7 @@ services:
           font-src 'self';
           manifest-src 'self';
           worker-src 'self';
-          connect-src 'self' https://api.github.com https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://api.mapbox.com;
+          connect-src 'self' https://api.github.com https://delsolapi.markgarrison.io https://api.mapbox.com;
           base-uri 'self';
           form-action 'self';
           frame-ancestors 'none';
@@ -57,3 +57,25 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # Del Sol Clock backend API. Currently a CORS proxy for GitHub release-asset
+  # downloads (the static frontend can't read GitHub's CDN responses directly — no
+  # CORS header on the final asset response — so this service fetches them
+  # server-side and re-serves with CORS), but named generically so other backend
+  # needs can live here later. Kept on the free tier; it cold-starts after idling,
+  # so the frontend pings /healthz on load + on connect to warm it before a download.
+  #
+  # Custom domain: delsolapi.markgarrison.io is added via the Render dashboard
+  # (Blueprints can't declare custom domains), with the DNS CNAME pointed at the
+  # service per Render's instructions. That domain is what the frontend calls
+  # (API_BASE) and what the connect-src CSP above allows; the default
+  # <name>.onrender.com URL still works but isn't referenced by the app.
+  - type: web
+    runtime: node
+    name: delsol-api
+    plan: free
+    rootDir: api
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeployTrigger: commit
+    healthCheckPath: /healthz

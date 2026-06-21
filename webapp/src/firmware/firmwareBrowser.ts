@@ -5,10 +5,27 @@
 export const REPO_OWNER = 'Marcus10110';
 export const REPO_NAME = 'DelSolClock';
 
+// Base URL of the Del Sol backend API (see api/ + render.yaml). It currently
+// proxies asset downloads: GitHub's CDN doesn't send CORS on the final asset
+// response, so the static frontend can't read asset bytes directly; the API
+// fetches them server-side and re-serves with CORS. Overridable via
+// VITE_API_BASE for local/dev or a different host.
+export const API_BASE =
+  import.meta.env.VITE_API_BASE || 'https://delsolapi.markgarrison.io';
+
+/** Fire-and-forget warmup so the free-tier API is awake before a download. */
+export function warmupApi(): void {
+  // Don't await; failures are harmless (the service may simply be cold-starting).
+  fetch(`${API_BASE}/healthz`, { method: 'GET' }).catch(() => {});
+}
+
 export interface ReleaseAsset {
   name: string;
   size: number;
+  /** Human-facing github.com download URL (302-redirects; NOT CORS-safe in iOS WebKit). */
   browserDownloadUrl: string;
+  /** API asset endpoint (api.github.com/.../assets/<id>); CORS-safe with Accept: octet-stream. */
+  apiUrl: string;
 }
 
 /** Machine-readable metadata embedded in the release body (delsol-meta block). */
@@ -66,6 +83,7 @@ interface GhAsset {
   name: string;
   size: number;
   browser_download_url: string;
+  url: string;
 }
 interface GhRelease {
   tag_name: string;
@@ -99,6 +117,7 @@ export async function fetchReleases(
         name: a.name,
         size: a.size,
         browserDownloadUrl: a.browser_download_url,
+        apiUrl: a.url,
       }));
       const byName = (name: string) =>
         assets.find((a) => a.name.toLowerCase() === name) ?? null;
@@ -128,11 +147,29 @@ export async function fetchReleases(
     .filter((r) => r.firmwareAsset !== null);
 }
 
-/** Download an asset as raw bytes. */
+/**
+ * Download an asset as raw bytes, via the backend API's download proxy.
+ *
+ * GitHub release-asset bytes are served from a CDN with no CORS header on the
+ * final response, so the browser can't read them directly (this is the "Load
+ * failed" seen in iOS WebKit / Bluefy). We pass the GitHub API asset URL to our
+ * API, which fetches it server-side and re-serves it with CORS.
+ */
 async function downloadAsset(asset: ReleaseAsset): Promise<Uint8Array> {
-  const res = await fetch(asset.browserDownloadUrl);
+  const url = `${API_BASE}/dl?url=${encodeURIComponent(asset.apiUrl)}`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/octet-stream' },
+  });
   if (!res.ok) {
-    throw new Error(`Download ${res.status}: ${res.statusText}`);
+    // Surface the API's JSON error message when present.
+    let detail = res.statusText;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) detail = body.error;
+    } catch {
+      // non-JSON body; keep statusText
+    }
+    throw new Error(`Download failed (${res.status}): ${detail}`);
   }
   const buf = await res.arrayBuffer();
   return new Uint8Array(buf);

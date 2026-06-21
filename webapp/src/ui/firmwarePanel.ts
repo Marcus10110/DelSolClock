@@ -9,6 +9,7 @@ import {
   downloadFirmware,
   fetchReleases,
   type Release,
+  type ReleaseAsset,
 } from '../firmware/firmwareBrowser';
 
 export class FirmwarePanel {
@@ -18,11 +19,22 @@ export class FirmwarePanel {
   private busy = false;
   /** Device firmware info (proto + current SPIFFS hash), once connected. */
   private deviceInfo: FirmwareInfo | null = null;
+  /** Optional sink for progress/diagnostic lines (wired to the on-screen log). */
+  private logger: ((level: string, message: string) => void) | null = null;
 
   constructor() {
     this.el = document.createElement('div');
     this.el.className = 'card';
     this.renderIdle();
+  }
+
+  /** Route the panel's diagnostics to the on-screen log (Bluefy has no console). */
+  setLogger(logger: (level: string, message: string) => void): void {
+    this.logger = logger;
+  }
+
+  private log(level: string, message: string): void {
+    this.logger?.(level, message);
   }
 
   /** Called by StatusPage whenever the connection changes (or clears). */
@@ -169,14 +181,10 @@ export class FirmwarePanel {
   /** Shared download-then-flash flow used by both firmware and filesystem updates. */
   private async runFlash(opts: {
     kind: 'firmware' | 'filesystem';
-    asset: { name: string; size: number; browserDownloadUrl: string };
+    asset: ReleaseAsset;
     releaseName: string;
     confirmExtra: string;
-    download: (asset: {
-      name: string;
-      size: number;
-      browserDownloadUrl: string;
-    }) => Promise<Uint8Array>;
+    download: (asset: ReleaseAsset) => Promise<Uint8Array>;
     flash: (
       data: Uint8Array,
       onProgress: (p: { percent: number; message: string }) => void,
@@ -210,7 +218,9 @@ export class FirmwarePanel {
 
     try {
       msgEl.textContent = `Downloading ${opts.kind}…`;
+      this.log('info', `Downloading ${opts.kind} from ${opts.asset.browserDownloadUrl}`);
       const data = await opts.download(opts.asset);
+      this.log('ok', `Downloaded ${opts.kind}: ${data.length} bytes.`);
 
       const success = await opts.flash(data, (p) => {
         fillEl.style.width = `${p.percent}%`;
@@ -219,12 +229,15 @@ export class FirmwarePanel {
       });
 
       if (success) {
+        this.log('ok', `${opts.kind} update complete.`);
         msgEl.innerHTML = `<span class="fw-ok">✅ Update complete. The device will reboot.</span>`;
       } else {
+        this.log('error', `${opts.kind} update failed (see prior log lines).`);
         msgEl.innerHTML = `<span class="fw-error">❌ Update failed. See log for details.</span>`;
       }
     } catch (err) {
       const m = err instanceof Error ? err.message : String(err);
+      this.log('error', `${opts.kind} update error: ${m}`);
       msgEl.innerHTML = `<span class="fw-error">❌ ${escapeHtml(m)}</span>`;
     } finally {
       this.busy = false;
