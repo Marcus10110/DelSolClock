@@ -7,6 +7,7 @@
 #include "clock_screen.h"
 #include "gmeter_screen.h"
 #include "notification_screens.h"
+#include "perspective_screen.h"
 #include "quarter_mile_screens.h"
 #include "simple_screens.h"
 #include "status_screen.h"
@@ -178,6 +179,33 @@ const std::vector<DemoScreen> g_demo_screens = {
        p.zeroSixtyTimeSec = 9.9;
        p.quarterMileTimeSec = 87.1;
        display::quarter_mile::DrawSummary(g, p);
+     }},
+
+    {"Perspective-Straight",
+     [](Adafruit_GFX* g) {
+       display::PerspectiveProps p;  // no centerline => straight road
+       display::DrawPerspective(g, p);
+     }},
+
+    {"Perspective-CurveRight",
+     [](Adafruit_GFX* g) {
+       display::PerspectiveProps p;
+       // Synthetic centerline curving to the right ahead of the car.
+       for (float d = 1.0f; d <= 120.0f; d += 4.0f) {
+         float right = 0.0008f * d * d;  // gentle rightward bend
+         p.centerline.push_back({d, right});
+       }
+       display::DrawPerspective(g, p);
+     }},
+
+    {"Perspective-CurveLeft",
+     [](Adafruit_GFX* g) {
+       display::PerspectiveProps p;
+       for (float d = 1.0f; d <= 120.0f; d += 4.0f) {
+         float right = -0.0008f * d * d;
+         p.centerline.push_back({d, right});
+       }
+       display::DrawPerspective(g, p);
      }},
 };
 

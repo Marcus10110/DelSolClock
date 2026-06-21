@@ -12,6 +12,13 @@ namespace nav {
 /** Great-circle-ish distance in meters between two lat/lngs (equirectangular). */
 double distanceMeters(const LatLng& a, const LatLng& b);
 
+// Local east/north offset of `p` relative to `origin`, in meters (equirect).
+struct MetersEN {
+  double east{0};
+  double north{0};
+};
+MetersEN localOffsetMeters(const LatLng& p, const LatLng& origin);
+
 struct Projection {
   LatLng point;             // projected point on the segment
   double t{0};              // 0..1 position along the segment a->b

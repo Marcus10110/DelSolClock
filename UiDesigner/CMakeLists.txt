@@ -31,6 +31,7 @@ add_library(display-shared
   ${DISPLAY_LIB}/src/notification_screens.cpp
   ${DISPLAY_LIB}/src/gmeter_screen.cpp
   ${DISPLAY_LIB}/src/quarter_mile_screens.cpp
+  ${DISPLAY_LIB}/src/perspective_screen.cpp
   ${DISPLAY_LIB}/src/demo_screens.cpp
   # image_loader_spiffs.cpp is firmware-only; the desktop file-backed loader is
   # compiled into the executables below instead.
@@ -68,6 +69,7 @@ add_library(navigation-shared
   ${NAV_LIB}/src/matcher.cpp
   ${NAV_LIB}/src/route_io.cpp
   ${NAV_LIB}/src/route_codec.cpp
+  ${NAV_LIB}/src/centerline.cpp
 )
 target_include_directories(navigation-shared PUBLIC ${NAV_LIB}/include)
 target_compile_features(navigation-shared PUBLIC cxx_std_20)
@@ -75,6 +77,15 @@ target_compile_features(navigation-shared PUBLIC cxx_std_20)
 add_executable(nav_cli ${NAV_LIB}/cli/nav_cli.cpp)
 target_link_libraries(nav_cli PRIVATE navigation-shared)
 target_compile_features(nav_cli PRIVATE cxx_std_20)
+
+# nav_render: render the perspective view at many GPS points along a route to
+# individual BMPs + a labeled grid (the perspective dev/verification harness).
+add_executable(nav_render
+  runner/nav_render.cpp
+  runner/image_loader_file.cpp
+)
+target_link_libraries(nav_render PRIVATE display-shared navigation-shared)
+target_compile_features(nav_render PRIVATE cxx_std_20)
 
 set(DEFAULT_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/out")
 message(STATUS "Default output directory: ${DEFAULT_OUTPUT_DIR}")

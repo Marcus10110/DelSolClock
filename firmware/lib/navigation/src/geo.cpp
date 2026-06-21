@@ -20,6 +20,11 @@ XY toLocal(const LatLng& p, const LatLng& origin) {
 }
 }  // namespace
 
+MetersEN localOffsetMeters(const LatLng& p, const LatLng& origin) {
+  const XY xy = toLocal(p, origin);
+  return {xy.x, xy.y};  // x = east, y = north
+}
+
 double distanceMeters(const LatLng& a, const LatLng& b) {
   const XY d = toLocal(b, a);
   return std::hypot(d.x, d.y);
