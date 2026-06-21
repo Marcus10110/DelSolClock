@@ -105,6 +105,16 @@ void setup()
     CarIO::Setup();
     gTft = new Tft::Tft();
     gTft->Init();
+
+    // Measure the cost of hashing the whole SPIFFS partition at boot. This is the
+    // identity we expose so the web app can tell which release's filesystem image
+    // is currently loaded. Logging the time confirms it's cheap enough to do on boot.
+    {
+        uint32_t hash_ms = 0;
+        std::string spiffs_hash = BleOta::HashSpiffsPartition( &hash_ms );
+        LOG_INFO( "SPIFFS partition sha256: %s (computed in %u ms)", spiffs_hash.c_str(), hash_ms );
+    }
+
     Gps::Begin();
     Motion::Begin();
     {

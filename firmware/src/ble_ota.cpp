@@ -9,6 +9,8 @@
 #include <mutex>
 
 #include "esp_ota_ops.h"
+#include "esp_partition.h"
+#include "mbedtls/sha256.h"
 
 #define FIRMWARE_UPDATE_SERVICE_UUID "69da0f2b-43a4-4c2a-b01d-0f11564c732b"
 #define FIRMWARE_UPDATE_WRITE_CHARACTERISTIC_UUID "7efc013a-37b7-44da-8e1c-06e28256d83b"
@@ -163,5 +165,72 @@ namespace BleOta
             return true;
         }
         return false;
+    }
+
+    std::string HashSpiffsPartition( uint32_t* out_elapsed_ms )
+    {
+        auto start_time = millis();
+
+        const esp_partition_t* part =
+            esp_partition_find_first( ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr );
+        if( part == nullptr )
+        {
+            LOG_ERROR( "HashSpiffsPartition: no SPIFFS partition found" );
+            if( out_elapsed_ms )
+            {
+                *out_elapsed_ms = millis() - start_time;
+            }
+            return "";
+        }
+
+        // Read the raw partition in chunks and feed each into SHA-256. Hashing the
+        // full partition size (not just used blocks) keeps the result equal to
+        // sha256(spiffs.bin), which is also the full padded image.
+        constexpr size_t ChunkSize = 4096;
+        static uint8_t buffer[ ChunkSize ]; // static: avoid a 4 KB stack allocation.
+
+        mbedtls_sha256_context ctx;
+        mbedtls_sha256_init( &ctx );
+        mbedtls_sha256_starts( &ctx, 0 ); // 0 = SHA-256 (not SHA-224)
+
+        bool ok = true;
+        for( size_t offset = 0; offset < part->size; offset += ChunkSize )
+        {
+            size_t to_read = part->size - offset;
+            if( to_read > ChunkSize )
+            {
+                to_read = ChunkSize;
+            }
+            esp_err_t err = esp_partition_read( part, offset, buffer, to_read );
+            if( err != ESP_OK )
+            {
+                LOG_ERROR( "HashSpiffsPartition: esp_partition_read failed at %u: %i", ( unsigned )offset, err );
+                ok = false;
+                break;
+            }
+            mbedtls_sha256_update( &ctx, buffer, to_read );
+        }
+
+        uint8_t digest[ 32 ];
+        mbedtls_sha256_finish( &ctx, digest );
+        mbedtls_sha256_free( &ctx );
+
+        std::string hex;
+        if( ok )
+        {
+            static const char* kHex = "0123456789abcdef";
+            hex.reserve( 64 );
+            for( int i = 0; i < 32; ++i )
+            {
+                hex.push_back( kHex[ digest[ i ] >> 4 ] );
+                hex.push_back( kHex[ digest[ i ] & 0x0F ] );
+            }
+        }
+
+        if( out_elapsed_ms )
+        {
+            *out_elapsed_ms = millis() - start_time;
+        }
+        return hex;
     }
 }
