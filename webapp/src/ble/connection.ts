@@ -323,25 +323,43 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     const svc = await this.server.getPrimaryService(SVC_FIRMWARE);
     const writeChar = await svc.getCharacteristic(CHR_FW_WRITE);
 
-    // Set up a single-shot notification waiter reused for each chunk's ack.
+    // Ack waiter. The device acks each write with a notification, but a
+    // notification can arrive in the gap between one `await ack` resolving and the
+    // next `waitForAck()` arming its handler. A single-shot handler would DROP
+    // that ack and the next wait would hang until timeout (the intermittent,
+    // position-varying "Timed out waiting for device response" seen on proto-2).
+    // Fix: queue acks that arrive with no waiter armed, so the next waitForAck()
+    // consumes the buffered one immediately instead of waiting.
     let pending: ((response: string) => void) | null = null;
+    const queued: string[] = [];
     const onResponse = (e: Event) => {
       const char = e.target as BluetoothRemoteGATTCharacteristic;
       const text = char.value ? new TextDecoder().decode(char.value).trim() : '';
-      pending?.(text);
+      if (pending) {
+        const resolve = pending;
+        pending = null;
+        resolve(text);
+      } else {
+        queued.push(text);
+      }
     };
     writeChar.addEventListener('characteristicvaluechanged', onResponse);
     await writeChar.startNotifications();
 
     const waitForAck = (): Promise<string> =>
       new Promise((resolve, reject) => {
+        // If an ack already arrived before we armed, consume it now.
+        const buffered = queued.shift();
+        if (buffered !== undefined) {
+          resolve(buffered);
+          return;
+        }
         const timer = setTimeout(() => {
           pending = null;
           reject(new Error('Timed out waiting for device response.'));
         }, OTA_NOTIFY_TIMEOUT_MS);
         pending = (response) => {
           clearTimeout(timer);
-          pending = null;
           resolve(response);
         };
       });
