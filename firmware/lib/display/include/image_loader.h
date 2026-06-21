@@ -15,8 +15,12 @@ namespace display {
 // Draw a BMP at (x,y). For monochrome (1-bit) images, monochrome_color is the
 // foreground color. delete_after_draw drops any cache entry after drawing
 // (matches the old Display::DrawBMP semantics for one-shot large images).
+// transparent_color: an RGB565 color to treat as transparent (skip those
+// pixels); -1 (default) draws every pixel opaque. BMPs can't store alpha, so a
+// magenta key color is the convention for sprites.
 void DrawBMP(Adafruit_GFX* gfx, const char* path, int16_t x, int16_t y,
-             bool delete_after_draw = false, uint16_t monochrome_color = 0xFFFF);
+             bool delete_after_draw = false, uint16_t monochrome_color = 0xFFFF,
+             int32_t transparent_color = -1);
 
 // Preload (and cache) an image so a later DrawBMP is fast. Returns false on
 // failure. (Firmware uses this for the slow splash image.)

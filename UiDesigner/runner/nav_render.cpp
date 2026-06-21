@@ -159,6 +159,7 @@ static size_t RenderAt(GFXcanvas16& canvas, const nav::RouteSummary& route,
   p.maxDrawDistanceM = 200.0;  // match the centerline look-ahead
   p.headingDegrees = heading;
   p.centerlinePhaseM = phaseM;
+  p.carSpritePath = "/del_sol_sprite_24b.bmp";
   for (const auto& lp : local) {
     p.centerline.push_back(
         {static_cast<float>(lp.forward), static_cast<float>(lp.right)});

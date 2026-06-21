@@ -44,6 +44,12 @@ uint16_t RGB_to_RGB565(uint8_t r, uint8_t g, uint8_t b) {
   return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
+// Magenta transparent-key test: bright red + bright blue + low green. Tolerant
+// of the near-magenta spread that lossy sprite encoders produce.
+bool IsKeyColor(uint8_t r, uint8_t g, uint8_t b) {
+  return r > 200 && b > 200 && g < 80;
+}
+
 std::string NormalizePath(const char* path) {
   if (!path) return "";
   std::string n = path;
@@ -64,7 +70,8 @@ bool PreloadImage(const char* /*path*/) {
 }
 
 void DrawBMP(Adafruit_GFX* gfx, const char* path, int16_t x, int16_t y,
-             bool /*delete_after_draw*/, uint16_t /*monochrome_color*/) {
+             bool /*delete_after_draw*/, uint16_t /*monochrome_color*/,
+             int32_t transparent_color) {
   if (!gfx || !path) return;
   std::string p = NormalizePath(path);
   if (!fs::exists(p)) {
@@ -124,20 +131,23 @@ void DrawBMP(Adafruit_GFX* gfx, const char* path, int16_t x, int16_t y,
     int16_t destY = bottomUp ? y + (imgHeight - 1 - r) : y + r;
     for (int32_t c = 0; c < imgWidth; c++) {
       int16_t destX = x + c;
-      uint16_t rgb565 = 0;
+      uint8_t sr = 0, sg = 0, sb = 0;  // source 8-bit RGB
       if (info.bitsPerPixel == 24) {
-        rgb565 = RGB_to_RGB565(row[c * 3 + 2], row[c * 3 + 1], row[c * 3]);
+        sb = row[c * 3]; sg = row[c * 3 + 1]; sr = row[c * 3 + 2];
       } else if (info.bitsPerPixel == 32) {
-        rgb565 = RGB_to_RGB565(row[c * 4 + 2], row[c * 4 + 1], row[c * 4]);
+        sb = row[c * 4]; sg = row[c * 4 + 1]; sr = row[c * 4 + 2];
       } else {  // 8-bit indexed
         uint8_t idx = row[c];
         if (idx < palette.size()) {
           uint32_t rgb = palette[idx];
-          rgb565 = RGB_to_RGB565((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF,
-                                 rgb & 0xFF);
+          sr = (rgb >> 16) & 0xFF; sg = (rgb >> 8) & 0xFF; sb = rgb & 0xFF;
         }
       }
-      gfx->drawPixel(destX, destY, rgb565);
+      // Magenta-key transparency: skip pixels close to the key color. Lossy
+      // sprite encoders spread the key over several near-magenta values, so a
+      // tolerance test is needed (an exact RGB565 match misses many).
+      if (transparent_color >= 0 && IsKeyColor(sr, sg, sb)) continue;
+      gfx->drawPixel(destX, destY, RGB_to_RGB565(sr, sg, sb));
     }
   }
   fclose(file);

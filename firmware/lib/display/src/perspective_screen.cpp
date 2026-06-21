@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "draw_helpers.h"
+#include "image_loader.h"
 
 namespace display {
 namespace {
@@ -443,6 +444,19 @@ void DrawPerspective(Adafruit_GFX* gfx, const PerspectiveProps& props) {
     prevL = l;
     prevR = r;
     prevC = cen;
+  }
+
+  // Car sprite at bottom-center (rear view), over the road. Magenta is the
+  // transparent key. Sized to the placeholder asset; positioned so it rests just
+  // above where the bottom HUD bar sits.
+  if (!props.carSpritePath.empty()) {
+    constexpr int kCarW = 38, kCarH = 27;     // placeholder sprite size
+    constexpr uint16_t kCarKey = 0xF01D;      // magenta (244,3,237) in RGB565
+    const int16_t spriteX = centerX - kCarW / 2;
+    const int16_t spriteY = H - kCarH - 18;   // clearance for the bottom HUD bar
+    DrawBMP(gfx, props.carSpritePath.c_str(), spriteX, spriteY,
+            /*delete_after_draw=*/false, /*monochrome_color=*/0xFFFF,
+            /*transparent_color=*/kCarKey);
   }
 }
 

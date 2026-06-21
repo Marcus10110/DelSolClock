@@ -488,6 +488,7 @@ void loop()
             else if( mph_now >= 3.0f ) tier_step = 0.5f;  // slow
             nav_dash_phase += tier_step;
             persp.centerlinePhaseM = nav_dash_phase;
+            persp.carSpritePath = "/del_sol_sprite_24b.bmp";  // from SPIFFS
 
             persp.centerline.reserve( gNavCenterline.size() );
             for( const auto& lp : gNavCenterline )

@@ -9,6 +9,7 @@
 
 #include <Adafruit_GFX.h>
 
+#include <string>
 #include <vector>
 
 namespace display {
@@ -41,6 +42,10 @@ struct PerspectiveProps {
   // Upcoming route centerline in car-local meters, ordered from the car forward.
   // Empty => draw a straight road (step 1a behavior).
   std::vector<CenterlinePoint> centerline;
+
+  // Car sprite drawn at the bottom-center (rear view), over the road. Empty =>
+  // none. The sprite's magenta key color is treated as transparent.
+  std::string carSpritePath;
 };
 
 void DrawPerspective(Adafruit_GFX* gfx, const PerspectiveProps& props);

@@ -36,7 +36,8 @@ bool PreloadImage(const char* path) {
 }
 
 void DrawBMP(Adafruit_GFX* gfx, const char* path, int16_t x, int16_t y,
-             bool delete_after_draw, uint16_t monochrome_color) {
+             bool delete_after_draw, uint16_t monochrome_color,
+             int32_t transparent_color) {
   if (!gfx) return;
   if (!PreloadImage(path)) return;
 
@@ -46,8 +47,28 @@ void DrawBMP(Adafruit_GFX* gfx, const char* path, int16_t x, int16_t y,
 
   if (loaded_image.getFormat() == IMAGE_16) {
     auto* image_canvas = static_cast<GFXcanvas16*>(raw_canvas);
-    gfx->drawRGBBitmap(x, y, image_canvas->getBuffer(), image_canvas->width(),
-                       image_canvas->height());
+    if (transparent_color < 0) {
+      gfx->drawRGBBitmap(x, y, image_canvas->getBuffer(), image_canvas->width(),
+                         image_canvas->height());
+    } else {
+      // Per-pixel draw, skipping near-magenta pixels (the sprite transparency
+      // key). The image is already RGB565 here, so test the channels directly:
+      // bright red (R5) + bright blue (B5) + low green (G6). A tolerance test is
+      // used because lossy sprite encoders spread the key over several values.
+      const uint16_t* buf = image_canvas->getBuffer();
+      const int16_t iw = image_canvas->width();
+      const int16_t ih = image_canvas->height();
+      for (int16_t row = 0; row < ih; ++row) {
+        for (int16_t col = 0; col < iw; ++col) {
+          uint16_t px = buf[row * iw + col];
+          uint8_t r5 = (px >> 11) & 0x1F;
+          uint8_t g6 = (px >> 5) & 0x3F;
+          uint8_t b5 = px & 0x1F;
+          bool isKey = r5 >= 25 && b5 >= 25 && g6 <= 18;  // ~magenta
+          if (!isKey) gfx->drawPixel(x + col, y + row, px);
+        }
+      }
+    }
   } else if (loaded_image.getFormat() == IMAGE_1) {
     auto* image_canvas = static_cast<GFXcanvas1*>(raw_canvas);
     gfx->drawBitmap(x, y, image_canvas->getBuffer(), image_canvas->width(),
