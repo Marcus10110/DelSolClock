@@ -43,20 +43,39 @@ void DrawStatus(Adafruit_GFX* gfx, const StatusProps& props) {
   const int y_pitch = 42;
 
   char buffer[128];
-  char ns = props.latitude > 0 ? 'N' : 'S';
-  char ew = props.longitude > 0 ? 'E' : 'W';
-  snprintf(buffer, sizeof(buffer), "%2.4f %c", std::abs(props.latitude), ns);
-  DrawPair(gfx, "Latitude", buffer, x1, y1);
 
-  snprintf(buffer, sizeof(buffer), "%3.4f %c", std::abs(props.longitude), ew);
-  DrawPair(gfx, "Longitude", buffer, x2, y1);
+  if (props.gpsHasFix) {
+    // Normal: GPS location / speed / heading.
+    char ns = props.latitude > 0 ? 'N' : 'S';
+    char ew = props.longitude > 0 ? 'E' : 'W';
+    snprintf(buffer, sizeof(buffer), "%2.4f %c", std::abs(props.latitude), ns);
+    DrawPair(gfx, "Latitude", buffer, x1, y1);
 
-  snprintf(buffer, sizeof(buffer), "%3.1f mph", props.speedMph);
-  DrawPair(gfx, "Speed", buffer, x1, y1 + y_pitch);
+    snprintf(buffer, sizeof(buffer), "%3.4f %c", std::abs(props.longitude), ew);
+    DrawPair(gfx, "Longitude", buffer, x2, y1);
 
-  DrawPair(gfx, "Heading",
-           HeadingToDirection(static_cast<float>(props.headingDegrees)), x2,
-           y1 + y_pitch);
+    snprintf(buffer, sizeof(buffer), "%3.1f mph", props.speedMph);
+    DrawPair(gfx, "Speed", buffer, x1, y1 + y_pitch);
+
+    DrawPair(gfx, "Heading",
+             HeadingToDirection(static_cast<float>(props.headingDegrees)), x2,
+             y1 + y_pitch);
+  } else {
+    // No fix yet: show GPS acquisition diagnostics in place of location so you
+    // can watch satellites come in outdoors. "In view" is the key field — it
+    // should climb as the antenna picks up satellites; a fix needs >= 4 used.
+    snprintf(buffer, sizeof(buffer), "%d", props.gpsSatsInView);
+    DrawPair(gfx, "Sats View", buffer, x1, y1);
+
+    snprintf(buffer, sizeof(buffer), "%d", props.gpsSatsUsed);
+    DrawPair(gfx, "Sats Used", buffer, x2, y1);
+
+    snprintf(buffer, sizeof(buffer), "%d", props.gpsFixQuality);
+    DrawPair(gfx, "Fix Q", buffer, x1, y1 + y_pitch);
+
+    snprintf(buffer, sizeof(buffer), "%lu", props.gpsChars);
+    DrawPair(gfx, "NMEA Bytes", buffer, x2, y1 + y_pitch, true);
+  }
 
   snprintf(buffer, sizeof(buffer), "%2.1f V", props.batteryVolts);
   DrawPair(gfx, "Battery", buffer, x1, y1 + y_pitch * 2);

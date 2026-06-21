@@ -53,6 +53,22 @@ const std::vector<DemoScreen> g_demo_screens = {
        display::DrawStatus(g, p);
      }},
 
+    {"Status-GPS-Acquiring",
+     [](Adafruit_GFX* g) {
+       // No-fix variant: shows GPS acquisition diagnostics instead of location.
+       display::StatusProps p;
+       p.batteryVolts = 12.5;
+       p.gpsHasFix = false;
+       p.gpsSatsInView = 7;
+       p.gpsSatsUsed = 0;
+       p.gpsFixQuality = 0;
+       p.gpsChars = 10533;
+       p.forwardG = 0.5;
+       p.lateralG = 0.1;
+       p.verticalG = 1.01;
+       display::DrawStatus(g, p);
+     }},
+
     {"OtaInProgress",
      [](Adafruit_GFX* g) {
        display::OtaInProgressProps p;

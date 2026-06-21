@@ -409,12 +409,22 @@ void loop()
     {
         display::StatusProps status;
         status.batteryVolts = car_status.mBatteryVoltage;
-        if( Gps::GetGps()->location.isValid() )
+        status.gpsHasFix = Gps::GetGps()->location.isValid();
+        if( status.gpsHasFix )
         {
             status.latitude = Gps::GetGps()->location.lat();
             status.longitude = Gps::GetGps()->location.lng();
             status.speedMph = Gps::GetGps()->speed.mph();
             status.headingDegrees = Gps::GetGps()->course.deg();
+        }
+        else
+        {
+            // No fix: show acquisition diagnostics so it can be watched outdoors.
+            auto dbg = Gps::GetDebug();
+            status.gpsSatsInView = dbg.satsInView;
+            status.gpsSatsUsed = dbg.satsUsed;
+            status.gpsFixQuality = dbg.fixQuality;
+            status.gpsChars = dbg.charsProcessed;
         }
         auto motion = Motion::GetState();
         if( motion.mValid )
