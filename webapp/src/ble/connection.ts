@@ -110,8 +110,9 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
 
   /**
    * Devices the user has previously granted access to (via getDevices()), so we
-   * can reconnect without the picker. Returns [] if the browser doesn't support
-   * getDevices() — notably Bluefy on iOS, where the picker is always required.
+   * can reconnect without the picker. Returns [] only if the browser lacks
+   * getDevices(). (Bluefy on iOS DOES support it and persists handles across
+   * page loads — confirmed on-device — so reconnect-without-picker works there.)
    */
   static async getKnownDevices(): Promise<BluetoothDevice[]> {
     if (!DelSolConnection.isSupported() || !navigator.bluetooth.getDevices) {
@@ -128,8 +129,15 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
 
   /**
    * Reconnect to a previously-granted device without showing the picker.
-   * Waits for an advertisement first (so the device is in range) to avoid the
-   * "out of range" error you get connecting to a stale getDevices() handle.
+   *
+   * Calls device.gatt.connect() DIRECTLY — no advertisement wait. A bonded /
+   * previously-granted device (from getDevices()) can be reconnected directly
+   * even when it isn't advertising and doesn't show up in the picker. This is
+   * the behavior confirmed on iOS/Bluefy: the device stays connectable at the OS
+   * level after the page closes, so a direct gatt.connect() succeeds where a
+   * scan/picker finds nothing. (Waiting for an advertisement here was the cause
+   * of the old "times out after 10s" reconnect bug — the device never
+   * advertises while it's OS-connected.)
    */
   async reconnect(device: BluetoothDevice): Promise<void> {
     if (!DelSolConnection.isSupported()) {
@@ -138,7 +146,6 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     try {
       this.setState('connecting');
       this.log('info', `Reconnecting to "${device.name ?? device.id}"…`);
-      await this.waitForInRange(device);
       await this.establishConnection(device);
     } catch (err) {
       this.fail(err);
@@ -147,31 +154,37 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
   }
 
   /**
-   * Wait until the device advertises (is in range), then stop watching. If
-   * watchAdvertisements isn't supported, fall through and let connect() try
-   * directly. Times out after ~10s.
+   * Reconnect by trying every previously-granted device in turn, stopping at the
+   * first that connects. The picker can grant several handles over time (e.g.
+   * pairing with more than one clock, or stale handles after "forget device");
+   * only one is live, and dead handles fail fast (a GATT error), so we just try
+   * them in order. Throws if none connect.
    */
-  private async waitForInRange(device: BluetoothDevice): Promise<void> {
-    if (typeof device.watchAdvertisements !== 'function') return;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const onAdv = () => {
-          device.removeEventListener('advertisementreceived', onAdv);
-          resolve();
-        };
-        device.addEventListener('advertisementreceived', onAdv);
-        controller.signal.addEventListener('abort', () => {
-          device.removeEventListener('advertisementreceived', onAdv);
-          reject(new Error('Device not found in range (timed out).'));
-        });
-        device.watchAdvertisements({ signal: controller.signal }).catch(reject);
-      });
-    } finally {
-      clearTimeout(timeout);
-      controller.abort();
+  async reconnectAny(): Promise<void> {
+    if (!DelSolConnection.isSupported()) {
+      throw new Error('Web Bluetooth is not available in this browser.');
     }
+    const devices = await DelSolConnection.getKnownDevices();
+    if (devices.length === 0) {
+      throw new Error('No previously-paired device to reconnect to.');
+    }
+    let lastErr: unknown = null;
+    for (let i = 0; i < devices.length; i++) {
+      const device = devices[i];
+      try {
+        this.setState('connecting');
+        this.log('info',
+          `Reconnecting to "${device.name ?? device.id}" (${i + 1}/${devices.length})…`);
+        await this.establishConnection(device);
+        return; // connected
+      } catch (err) {
+        lastErr = err;
+        this.log('info', `Handle ${i + 1} failed: ${err instanceof Error ? err.message : String(err)}`);
+        this.cleanup(); // drop the half-open attempt before trying the next
+      }
+    }
+    this.fail(lastErr ?? new Error('Reconnect failed.'));
+    throw lastErr instanceof Error ? lastErr : new Error('Reconnect failed.');
   }
 
   /** Shared connect path used by both connect() (picker) and reconnect(). */
@@ -183,7 +196,13 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     this.log('info', 'Connecting to GATT server…');
     const gatt = this.device.gatt;
     if (!gatt) throw new Error('Device has no GATT server.');
-    this.server = await gatt.connect();
+    // Bound the connect so a dead/stale handle fails fast (lets reconnectAny()
+    // move on to the next handle instead of hanging).
+    this.server = await withTimeout(
+      gatt.connect(),
+      15_000,
+      'GATT connect timed out.',
+    );
     this.log('ok', 'GATT connected.');
 
     await this.readFirmwareVersion();
@@ -454,4 +473,21 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
   private log(level: ConnectionEvents['log']['level'], message: string): void {
     this.emit('log', { level, message });
   }
+}
+
+/** Reject if `p` doesn't settle within `ms`. */
+function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(message)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }

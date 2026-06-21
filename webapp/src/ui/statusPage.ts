@@ -208,13 +208,14 @@ export class StatusPage {
   }
 
   private async handleReconnect(): Promise<void> {
-    if (!this.knownDevice) return;
     const conn = new DelSolConnection();
     this.useConnection(conn);
     try {
-      await conn.reconnect(this.knownDevice);
+      // Try every previously-granted handle (stale ones fail fast) via a direct
+      // gatt.connect() — no picker, no advertisement wait.
+      await conn.reconnectAny();
     } catch {
-      // reconnect failed (out of range / off). Fall back to the picker.
+      // reconnect failed (device off / all handles dead). Fall back to picker.
       this.appendLog('info', 'Reconnect failed — use Connect to pick the device.');
     }
   }
