@@ -44,6 +44,8 @@ export class BleProbePanel {
         <button class="secondary" data-probe="avail">getAvailability()</button>
         <button class="secondary" data-probe="getDevices">getDevices()</button>
         <button class="secondary" data-probe="request">requestDevice (picker)</button>
+        <button class="secondary" data-probe="connectAll">Try-connect ALL known</button>
+        <button class="secondary" data-probe="forgetAll">Forget ALL known</button>
         <button class="secondary" data-probe="gattState">Retained GATT state</button>
         <button class="secondary" data-probe="gattConnect">Retained GATT connect</button>
         <button class="secondary" data-probe="gattDisconnect">Retained GATT disconnect</button>
@@ -78,6 +80,8 @@ export class BleProbePanel {
         case 'avail': await this.avail(); break;
         case 'getDevices': await this.getDevices(); break;
         case 'request': await this.request(); break;
+        case 'connectAll': await this.connectAll(); break;
+        case 'forgetAll': await this.forgetAll(); break;
         case 'gattState': this.gattState(); break;
         case 'gattConnect': await this.gattConnect(); break;
         case 'gattDisconnect': await this.gattDisconnect(); break;
@@ -155,6 +159,75 @@ export class BleProbePanel {
     this.log('ok', `Picked + retained: name="${device.name ?? '(none)'}" id=${device.id} gatt.connected=${device.gatt?.connected ?? '?'}`);
   }
 
+  private async connectAll(): Promise<void> {
+    const bt = this.bt();
+    if (!bt?.getDevices) {
+      this.log('warn', 'getDevices() not supported.');
+      return;
+    }
+    const devices = await bt.getDevices();
+    if (devices.length === 0) {
+      this.log('warn', 'getDevices() returned 0 — nothing to try.');
+      return;
+    }
+    this.log('info', `Trying gatt.connect() on ${devices.length} known device(s), 12s each…`);
+    for (let i = 0; i < devices.length; i++) {
+      const d = devices[i];
+      const gatt = d.gatt;
+      this.log('info', `[${i}] "${d.name ?? '(none)'}" id=${d.id} connected=${gatt?.connected ?? '?'}`);
+      if (!gatt) {
+        this.log('warn', `[${i}] no GATT server.`);
+        continue;
+      }
+      try {
+        const t0 = performance.now();
+        const server = await withTimeout(gatt.connect(), 12_000, 'gatt.connect timeout (12s)');
+        const ms = Math.round(performance.now() - t0);
+        this.log('ok', `[${i}] CONNECTED in ${ms}ms (connected=${server.connected}). Retained this one.`);
+        this.retained = d;
+        return; // stop on first success
+      } catch (err) {
+        this.log('error', `[${i}] failed: ${errMsg(err)}`);
+        try {
+          gatt.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    this.log('warn', 'None of the known devices connected.');
+  }
+
+  private async forgetAll(): Promise<void> {
+    const bt = this.bt();
+    if (!bt?.getDevices) {
+      this.log('warn', 'getDevices() not supported.');
+      return;
+    }
+    const devices = await bt.getDevices();
+    if (devices.length === 0) {
+      this.log('info', 'No known devices to forget.');
+      return;
+    }
+    let forgotten = 0;
+    for (const d of devices) {
+      const dev = d as BluetoothDevice & { forget?: () => Promise<void> };
+      if (typeof dev.forget !== 'function') {
+        this.log('warn', `forget() not supported — "${d.name ?? d.id}" left in place.`);
+        continue;
+      }
+      try {
+        await dev.forget();
+        forgotten++;
+        this.log('ok', `Forgot "${d.name ?? d.id}".`);
+      } catch (err) {
+        this.log('error', `forget("${d.name ?? d.id}") failed: ${errMsg(err)}`);
+      }
+    }
+    this.retained = null;
+    this.log('info', `Done. Forgot ${forgotten}/${devices.length}. Re-run getDevices() to confirm.`);
+  }
+
   private gattState(): void {
     if (!this.retained) {
       this.log('warn', 'No retained device. Run getDevices() or requestDevice first.');
@@ -173,7 +246,7 @@ export class BleProbePanel {
     }
     this.log('info', `gatt.connect() on "${this.retained.name ?? this.retained.id}"…`);
     const t0 = performance.now();
-    const server = await this.retained.gatt.connect();
+    const server = await withTimeout(this.retained.gatt.connect(), 12_000, 'gatt.connect timeout (12s)');
     const ms = Math.round(performance.now() - t0);
     this.log('ok', `gatt.connect() OK in ${ms}ms. connected=${server.connected}`);
   }
@@ -244,6 +317,27 @@ export class BleProbePanel {
 }
 
 function errMsg(err: unknown): string {
-  if (err instanceof Error) return `${err.name}: ${err.message}`;
-  return String(err);
+  if (err instanceof Error) {
+    const name = err.name || 'Error';
+    return err.message ? `${name}: ${err.message}` : name;
+  }
+  // Some BLE stacks (Bluefy) throw a bare numeric/string GATT error code rather
+  // than an Error. Surface the type so "2" isn't a mystery.
+  return `non-Error throw (${typeof err}): ${JSON.stringify(err)} [${String(err)}]`;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(message)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }
