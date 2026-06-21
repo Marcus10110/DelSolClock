@@ -1,6 +1,7 @@
 #include "nav_overlay.h"
 
 #include <cmath>
+#include <cstdio>
 
 #include "draw_helpers.h"
 #include "fonts.h"
@@ -165,6 +166,49 @@ void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
       gfx->print(sp.c_str());
     }
   }
+}
+
+TurnDir TurnDirFromManeuver(const std::string& type,
+                            const std::string& modifier) {
+  if (type == "arrive") return TurnDir::Arrive;
+  if (modifier == "uturn") return TurnDir::UTurn;
+  if (modifier == "sharp left") return TurnDir::SharpLeft;
+  if (modifier == "left") return TurnDir::Left;
+  if (modifier == "slight left") return TurnDir::SlightLeft;
+  if (modifier == "sharp right") return TurnDir::SharpRight;
+  if (modifier == "right") return TurnDir::Right;
+  if (modifier == "slight right") return TurnDir::SlightRight;
+  return TurnDir::Straight;  // continue / straight / merge / depart
+}
+
+std::string FormatDistanceImperial(double meters) {
+  const double feet = meters * 3.28084;
+  char buf[24];
+  if (feet < 1000.0) {
+    int ft = static_cast<int>(feet);
+    int step = ft < 200 ? 25 : 50;  // tidy increments
+    ft = (ft / step) * step;
+    if (ft < step) ft = step;  // never show 0 ft while still approaching
+    std::snprintf(buf, sizeof(buf), "%d ft", ft);
+  } else {
+    double mi = meters / 1609.344;
+    std::snprintf(buf, sizeof(buf), "%.1f mi", mi);
+  }
+  return buf;
+}
+
+std::string FormatEta(int nowHour24, int nowMinute, double minutesToAdd) {
+  if (!(minutesToAdd >= 0.0) || !std::isfinite(minutesToAdd)) return "";
+  int total = nowHour24 * 60 + nowMinute + static_cast<int>(minutesToAdd + 0.5);
+  total %= 24 * 60;
+  if (total < 0) total += 24 * 60;
+  int h = total / 60;
+  int m = total % 60;
+  int h12 = h % 12;
+  if (h12 == 0) h12 = 12;
+  char buf[12];
+  std::snprintf(buf, sizeof(buf), "%d:%02d", h12, m);
+  return buf;
 }
 
 }  // namespace display

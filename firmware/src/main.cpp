@@ -14,6 +14,9 @@
 #include "simple_screens.h"
 #include "status_screen.h"
 #include "notification_screens.h"
+#include "perspective_screen.h"
+#include "nav_overlay.h"
+#include "centerline.h"
 #include "gmeter_screen.h"
 #include "image_loader.h"
 #include "pins.h"
@@ -71,6 +74,7 @@ namespace
     nav::MatchResult gNavResult;
     bool gNavHasFix = false;        // GPS had a fresh fix at last match
     std::string gNavInstruction;    // next-maneuver instruction (owns the string)
+    std::vector<nav::LocalPoint> gNavCenterline;  // upcoming route, car-local meters
 
     Motion::HistoryTracker BrakeHistoryTracker( display::GMeterProps::HistorySize, 100 );
     Motion::HistoryTracker LateralHistoryTracker( display::GMeterProps::HistorySize, 100 );
@@ -268,6 +272,14 @@ void loop()
     Gps::Service();
     CarIO::Service();
 
+    // When a new route is downloaded, auto-switch to the Navigation screen so the
+    // driver sees turn-by-turn without manually cycling screens.
+    if( NavigationService::ConsumeNewRoute() )
+    {
+        gCurrentScreen = CurrentScreen::Navigation;
+        LOG_INFO( "nav: new route -> switching to Navigation screen" );
+    }
+
     // Live navigation matcher: when a route is loaded and the GPS has a fresh
     // fix, run the matcher (~1Hz on each new fix), store the result for the
     // Navigation screen, and log it (+ timing) for road testing.
@@ -294,6 +306,11 @@ void loop()
                 {
                     gNavInstruction = route.maneuvers[ gNavResult.nextManeuverIndex ].instruction;
                 }
+                // Upcoming road geometry for the perspective view, anchored at the
+                // matched (on-route) position so the road follows the route.
+                nav::CenterlineParams cl_params;
+                cl_params.aheadMeters = 200.0;
+                gNavCenterline = nav::routeCenterline( route, gNavResult.projected, cl_params );
                 LOG_INFO( "nav: along=%.0f off=%.1f%s toTurn=%.0f toDest=%.0f match=%uus next=\"%s\"",
                           gNavResult.distanceAlongRouteMeters, gNavResult.offRouteDistanceMeters,
                           gNavResult.isOffRoute ? " OFFROUTE" : "",
@@ -432,17 +449,77 @@ void loop()
 #endif
     else if( gCurrentScreen == CurrentScreen::Navigation )
     {
-        // Matcher-driven turn-by-turn screen (flag-independent). Fed by the live
-        // matcher result computed earlier this loop.
-        display::NavRouteProps nav_props;
-        nav_props.hasRoute = NavigationService::HasRoute();
-        nav_props.hasFix = gNavHasFix;
-        nav_props.isOffRoute = gNavResult.isOffRoute;
-        nav_props.instruction = gNavInstruction.c_str();
-        nav_props.distanceToTurnMeters = gNavResult.distanceToNextTurnMeters;
-        nav_props.offRouteDistanceMeters = gNavResult.offRouteDistanceMeters;
-        display::DrawNavRoute( &gDisplay, nav_props );
-        gTft->DrawCanvas( &gDisplay );
+        const bool show_perspective = NavigationService::HasRoute() && gNavHasFix &&
+                                      !gNavResult.isOffRoute && !gNavCenterline.empty();
+        if( show_perspective )
+        {
+            // Perspective road + nav data overlay, fed by the live matcher result.
+            const auto& route = NavigationService::GetRoute();
+
+            display::PerspectiveProps persp;
+            persp.maxDrawDistanceM = 200.0f;
+            persp.centerline.reserve( gNavCenterline.size() );
+            for( const auto& lp : gNavCenterline )
+            {
+                persp.centerline.push_back(
+                    { ( float )lp.forward, ( float )lp.right } );
+            }
+            gDisplay.fillScreen( 0x0000 );
+            display::DrawPerspective( &gDisplay, persp );
+
+            // Build the overlay from the matcher result + GPS speed + wall clock.
+            display::NavOverlayProps ov;
+            if( gNavResult.nextManeuverIndex >= 0 &&
+                gNavResult.nextManeuverIndex < ( int )route.maneuvers.size() )
+            {
+                const auto& m = route.maneuvers[ gNavResult.nextManeuverIndex ];
+                ov.dir = display::TurnDirFromManeuver( m.type, m.modifier );
+                ov.street = m.roadName;
+            }
+            ov.distance = display::FormatDistanceImperial( gNavResult.distanceToNextTurnMeters );
+
+            char remaining_buf[24];
+            snprintf( remaining_buf, sizeof( remaining_buf ), "%.1f mi",
+                      gNavResult.distanceToDestinationMeters / 1609.344 );
+            ov.remaining = remaining_buf;
+
+            // Speed (mph) from GPS, and an ETA from remaining distance / speed.
+            auto* gps = Gps::GetGps();
+            double mph = ( gps->speed.isValid() && gps->speed.age() < 60000 )
+                             ? gps->speed.mph()
+                             : 0.0;
+            if( mph >= 1.0 )
+            {
+                char speed_buf[12];
+                snprintf( speed_buf, sizeof( speed_buf ), "%d", ( int )( mph + 0.5 ) );
+                ov.speed = speed_buf;
+
+                tm now;
+                if( getLocalTime( &now, 100 ) )
+                {
+                    double miles = gNavResult.distanceToDestinationMeters / 1609.344;
+                    double minutes = miles / mph * 60.0;
+                    ov.eta = display::FormatEta( now.tm_hour, now.tm_min, minutes );
+                }
+            }
+
+            display::DrawNavOverlay( &gDisplay, ov );
+            gTft->DrawCanvas( &gDisplay );
+        }
+        else
+        {
+            // Fallback: no route / no fix / off-route — the simple text screen
+            // conveys status the perspective view can't.
+            display::NavRouteProps nav_props;
+            nav_props.hasRoute = NavigationService::HasRoute();
+            nav_props.hasFix = gNavHasFix;
+            nav_props.isOffRoute = gNavResult.isOffRoute;
+            nav_props.instruction = gNavInstruction.c_str();
+            nav_props.distanceToTurnMeters = gNavResult.distanceToNextTurnMeters;
+            nav_props.offRouteDistanceMeters = gNavResult.offRouteDistanceMeters;
+            display::DrawNavRoute( &gDisplay, nav_props );
+            gTft->DrawCanvas( &gDisplay );
+        }
     }
     else if( gCurrentScreen == CurrentScreen::GMeter )
     {

@@ -30,6 +30,7 @@ namespace NavigationService
 
         nav::RouteSummary CurrentRoute;    // last successfully decoded route
         bool RouteReady{ false };
+        bool NewRoutePending{ false };     // set on each new download; consumed by the loop
 
         class NavWriteCallbacks : public BLECharacteristicCallbacks
         {
@@ -68,6 +69,7 @@ namespace NavigationService
                             std::scoped_lock lock( Mutex );
                             CurrentRoute = decoded;
                             RouteReady = true;
+                            NewRoutePending = true;
                             RxBuffer.clear();
                         }
                         LOG_INFO( "nav: route OK %u bytes, %u pts, %u maneuvers, %u ms",
@@ -113,6 +115,14 @@ namespace NavigationService
     {
         std::scoped_lock lock( Mutex );
         return RouteReady;
+    }
+
+    bool ConsumeNewRoute()
+    {
+        std::scoped_lock lock( Mutex );
+        bool pending = NewRoutePending;
+        NewRoutePending = false;
+        return pending;
     }
 
     const nav::RouteSummary& GetRoute()

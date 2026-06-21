@@ -48,4 +48,21 @@ struct NavOverlayProps {
 // DrawPerspective.
 void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props);
 
+// ---- Formatting helpers (shared by the firmware + the UiDesigner harness) ---
+// These keep the display lib free of nav-lib types: callers pass plain values.
+
+// Map a Mapbox maneuver type + modifier (e.g. "turn"/"left", "arrive") to a
+// TurnDir. Unknown/continue/merge => Straight.
+TurnDir TurnDirFromManeuver(const std::string& type, const std::string& modifier);
+
+// Format a distance in meters as imperial text: feet in tidy steps under
+// ~1000 ft, miles with one decimal above (e.g. "75 ft", "1.2 mi"). Metric
+// toggle can come later.
+std::string FormatDistanceImperial(double meters);
+
+// Format an ETA clock time from the current wall-clock h:m plus minutes to add,
+// 12-hour style without AM/PM (e.g. 17:05 + 37 => "5:42"). minutesToAdd < 0 or
+// non-finite => "".
+std::string FormatEta(int nowHour24, int nowMinute, double minutesToAdd);
+
 }  // namespace display
