@@ -14,6 +14,8 @@ import type { LatLng, RouteManeuver, RouteSummary } from './types';
 export interface BuildOptions {
   /** Douglas–Peucker tolerance in meters. Default 5m (~GPS accuracy). */
   toleranceMeters?: number;
+  /** Which alternative to build (index into response.routes). Default 0. */
+  routeIndex?: number;
 }
 
 const DEFAULT_TOLERANCE_M = 5;
@@ -48,7 +50,7 @@ function nearestIndex(polyline: LatLng[], target: LatLng): number {
   return best;
 }
 
-/** Build a RouteSummary from a Mapbox Directions response (route 0). */
+/** Build a RouteSummary from a Mapbox Directions response (default route 0). */
 export function buildRouteSummary(
   raw: MapboxDirectionsResponse,
   opts: BuildOptions = {},
@@ -56,7 +58,7 @@ export function buildRouteSummary(
   if (raw.code !== 'Ok') {
     throw new Error(`Mapbox Directions error: ${raw.code}`);
   }
-  const route = raw.routes?.[0];
+  const route = raw.routes?.[opts.routeIndex ?? 0];
   if (!route) {
     throw new Error('Mapbox response contained no routes');
   }

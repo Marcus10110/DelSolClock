@@ -335,3 +335,105 @@ button:disabled {
 .dbg-danger:active {
   opacity: 0.85;
 }
+
+/* ---- navigation panel ---- */
+.nav-favs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.nav-chip {
+  width: auto;
+  flex: none;
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--accent-2);
+  border-radius: 999px;
+}
+.nav-search {
+  position: relative;
+}
+.nav-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  background: var(--accent-2);
+  color: var(--text);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  font: inherit;
+}
+.nav-input::placeholder {
+  color: var(--muted);
+}
+.nav-suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.nav-suggest-row {
+  padding: 9px 12px;
+  cursor: pointer;
+  border-top: 1px solid var(--card-border);
+}
+.nav-suggest-row:first-child {
+  border-top: 0;
+}
+.nav-suggest-row:hover {
+  background: var(--accent-2);
+}
+.nav-suggest-name {
+  font-weight: 600;
+}
+.nav-suggest-addr {
+  font-size: 13px;
+}
+.nav-origin {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.nav-opts-title {
+  font-size: 13px;
+  margin: 10px 0 6px;
+}
+.nav-opt {
+  width: 100%;
+  margin-bottom: 6px;
+  background: var(--accent-2);
+  text-align: left;
+}
+.nav-opt-sel {
+  background: var(--accent);
+}
+.nav-preview-img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  margin: 10px 0;
+  display: block;
+}
+.nav-actions {
+  display: flex;
+  gap: 8px;
+}
+.nav-actions button {
+  margin: 0;
+}
+.nav-error {
+  color: var(--off);
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+.nav-ok {
+  color: var(--on);
+  font-size: 14px;
+  margin: 8px 0 0;
+}

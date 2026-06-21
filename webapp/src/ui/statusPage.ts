@@ -14,6 +14,7 @@ import type {
 } from '../ble/types';
 import { FirmwarePanel } from './firmwarePanel';
 import { DebugPanel } from './debugPanel';
+import { NavigationPanel } from './navigationPanel';
 
 const DASH = '--';
 
@@ -23,6 +24,7 @@ export class StatusPage {
   private unsubscribers: Array<() => void> = [];
   private readonly firmwarePanel = new FirmwarePanel();
   private readonly debugPanel = new DebugPanel();
+  private readonly navigationPanel = new NavigationPanel();
 
   // A previously-granted device we can reconnect to without the picker.
   private knownDevice: BluetoothDevice | null = null;
@@ -44,6 +46,7 @@ export class StatusPage {
   private flagEls: Record<string, HTMLElement> = {};
   private battVal!: HTMLElement;
   private timeVal!: HTMLElement;
+  private navMount!: HTMLElement;
   private fwMount!: HTMLElement;
   private dbgMount!: HTMLElement;
 
@@ -51,6 +54,7 @@ export class StatusPage {
     this.el = document.createElement('div');
     this.el.innerHTML = this.template();
     this.cacheRefs();
+    this.navMount.appendChild(this.navigationPanel.el);
     this.fwMount.appendChild(this.firmwarePanel.el);
     this.dbgMount.appendChild(this.debugPanel.el);
     this.wireEvents();
@@ -112,6 +116,7 @@ export class StatusPage {
         <div class="row"><span class="k">Last update</span><span class="v muted" id="time-val">${DASH}</span></div>
       </div>
 
+      <div id="nav-mount"></div>
       <div id="fw-mount" class="hidden"></div>
       <div id="dbg-mount" class="hidden"></div>
 
@@ -138,6 +143,7 @@ export class StatusPage {
     this.statusCard = q('#status-card');
     this.battVal = q('#battery-val');
     this.timeVal = q('#time-val');
+    this.navMount = q('#nav-mount');
     this.fwMount = q('#fw-mount');
     this.dbgMount = q('#dbg-mount');
     this.logEl = q('#log');
@@ -171,6 +177,7 @@ export class StatusPage {
     this.conn = conn;
     this.firmwarePanel.setConnection(conn);
     this.debugPanel.setConnection(conn);
+    this.navigationPanel.setConnection(conn);
   }
 
   private checkSupport(): void {
@@ -246,6 +253,10 @@ export class StatusPage {
     this.statusCard.classList.toggle('hidden', !connected);
     this.fwMount.classList.toggle('hidden', !connected);
     this.dbgMount.classList.toggle('hidden', !connected);
+
+    // Nav panel stays visible while disconnected (search/preview are useful
+    // pre-connection); it just reflects connection state on its Send button.
+    this.navigationPanel.setConnection(connected ? this.conn : null);
 
     if (connected) {
       this.deviceVal.textContent = this.conn?.deviceName ?? DASH;

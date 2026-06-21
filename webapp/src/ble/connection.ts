@@ -34,6 +34,9 @@ import type {
   FirmwareUpdateProgress,
   IConnection,
 } from './iconnection';
+import { uploadRouteOverServer } from '../navigation/routeUpload';
+import type { UploadProgress, BluetoothServerLike } from '../navigation/routeUpload';
+import type { RouteSummary } from '../navigation/types';
 
 export class DelSolConnection extends Emitter<ConnectionEvents> implements IConnection {
   private device: BluetoothDevice | null = null;
@@ -415,6 +418,22 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     const chr = await svc.getCharacteristic(CHR_DEBUG_CONTROL);
     await chr.writeValue(new TextEncoder().encode(command));
     this.log('ok', `Sent debug command: ${command}`);
+  }
+
+  async uploadRoute(
+    summary: RouteSummary,
+    onProgress?: (p: UploadProgress) => void,
+  ): Promise<void> {
+    if (!this.server) throw new Error('Not connected.');
+    // The real BluetoothRemoteGATTServer is structurally compatible with the
+    // loader's minimal BluetoothServerLike (which is intentionally DOM-free for
+    // Node); the cast bridges TS's stricter DOM event-listener typing.
+    await uploadRouteOverServer(
+      this.server as unknown as BluetoothServerLike,
+      summary,
+      { onProgress, onLog: (m) => this.log('info', m) },
+    );
+    this.log('ok', 'Route uploaded.');
   }
 
   private cleanup(): void {

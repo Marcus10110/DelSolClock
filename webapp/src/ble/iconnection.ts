@@ -4,6 +4,8 @@
 
 import type { Emitter } from './emitter';
 import type { BatteryStatus, ConnectionState, VehicleStatus } from './types';
+import type { RouteSummary } from '../navigation/types';
+import type { UploadProgress } from '../navigation/routeUpload';
 
 export interface ConnectionEvents {
   state: ConnectionState;
@@ -64,4 +66,13 @@ export interface IConnection extends Emitter<ConnectionEvents> {
 
   /** Send a debug control command (reboot, clear, print, assert…). */
   sendDebugCommand(command: DebugCommand): Promise<void>;
+
+  /**
+   * Upload a navigation route to the device over the existing connection.
+   * Resolves on the device's "success" ack; throws on error/timeout.
+   */
+  uploadRoute(
+    summary: RouteSummary,
+    onProgress?: (p: UploadProgress) => void,
+  ): Promise<void>;
 }

@@ -44,25 +44,37 @@ export interface MapboxDirectionsResponse {
 
 const BASE = 'https://api.mapbox.com/directions/v5/mapbox/driving-traffic';
 
-/**
- * Fetch a traffic-aware route between two points. Coordinates are {lat,lng};
- * Mapbox wants lng,lat order in the URL. Not used by tests.
- */
-export async function fetchRoute(
+/** Build the Directions request URL (pure; unit-tested). */
+export function directionsUrl(
   start: LatLng,
   end: LatLng,
   accessToken: string,
-): Promise<MapboxDirectionsResponse> {
+  alternatives = true,
+): string {
   const coords = `${start.lng},${start.lat};${end.lng},${end.lat}`;
   const params = new URLSearchParams({
     steps: 'true',
     geometries: 'polyline6',
     overview: 'full',
     banner_instructions: 'true',
+    alternatives: alternatives ? 'true' : 'false',
     access_token: accessToken,
   });
-  const url = `${BASE}/${coords}?${params.toString()}`;
-  const res = await fetch(url);
+  return `${BASE}/${coords}?${params.toString()}`;
+}
+
+/**
+ * Fetch a traffic-aware route between two points. Coordinates are {lat,lng};
+ * Mapbox wants lng,lat order in the URL. With alternatives=true, the response's
+ * `routes` array holds up to ~3 options (route 0 is the recommended one).
+ */
+export async function fetchRoute(
+  start: LatLng,
+  end: LatLng,
+  accessToken: string,
+  alternatives = true,
+): Promise<MapboxDirectionsResponse> {
+  const res = await fetch(directionsUrl(start, end, accessToken, alternatives));
   if (!res.ok) {
     throw new Error(`Mapbox Directions ${res.status}: ${res.statusText}`);
   }

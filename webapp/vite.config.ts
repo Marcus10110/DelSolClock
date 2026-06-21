@@ -9,12 +9,13 @@ const CSP = [
   "script-src 'self'",
   // Vite inlines small styles; 'unsafe-inline' for styles only is low-risk.
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  // img-src includes api.mapbox.com for the static route-preview image.
+  "img-src 'self' data: https://api.mapbox.com",
   "font-src 'self'",
   "manifest-src 'self'",
   "worker-src 'self'",
-  // fetch targets: GitHub API + release asset downloads (and their redirect host)
-  "connect-src 'self' https://api.github.com https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com",
+  // fetch targets: GitHub API + release downloads + Mapbox search/directions.
+  "connect-src 'self' https://api.github.com https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://api.mapbox.com",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",

@@ -11,6 +11,8 @@ import type {
   IConnection,
 } from './iconnection';
 import type { ConnectionState, VehicleStatus } from './types';
+import type { UploadProgress } from '../navigation/routeUpload';
+import type { RouteSummary } from '../navigation/types';
 
 const DEMO_FW_VERSION = 'demo-1.0.0';
 
@@ -116,6 +118,20 @@ export class DemoConnection extends Emitter<ConnectionEvents> implements IConnec
     if (command === 'CLEAR') this.demoHasCrash = false;
     if (command === 'ASSERT' || command === 'ASSERT_LATER') this.demoHasCrash = true;
     this.log('ok', `Sent debug command: ${command} (demo)`);
+  }
+
+  async uploadRoute(
+    summary: RouteSummary,
+    onProgress?: (p: UploadProgress) => void,
+  ): Promise<void> {
+    const total = Math.max(1, summary.polyline.length);
+    this.log('info', `Demo route upload: ${summary.polyline.length} points.`);
+    for (let i = 0; i < total; i += Math.ceil(total / 5)) {
+      await delay(60);
+      onProgress?.({ bytesSent: i, totalBytes: total });
+    }
+    onProgress?.({ bytesSent: total, totalBytes: total });
+    this.log('ok', 'Route uploaded (demo).');
   }
 
   private emitFrame(): void {
