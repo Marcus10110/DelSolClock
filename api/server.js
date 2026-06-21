@@ -31,6 +31,14 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Accept',
 };
 
+// Optional GitHub token. Anonymous API requests from cloud/datacenter IPs (like
+// Render's) get rate-limited/403'd by GitHub; an authenticated request gets
+// 5000/hr and isn't IP-throttled the same way. A read-only token for public
+// repos is sufficient (public release assets need no special scope). Set via the
+// GITHUB_TOKEN env var on Render. Sent ONLY on the api.github.com call, never on
+// the signed CDN URL.
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+
 app.use((req, res, next) => {
   for (const [k, v] of Object.entries(CORS_HEADERS)) res.setHeader(k, v);
   if (req.method === 'OPTIONS') {
@@ -68,17 +76,41 @@ app.get('/dl', async (req, res) => {
   }
 
   try {
-    // Node's fetch follows the GitHub redirect chain to the CDN and reads the
-    // bytes server-side (no CORS restriction applies here).
-    const upstream = await fetch(assetUrl, {
-      headers: {
-        Accept: 'application/octet-stream',
-        'User-Agent': 'delsol-api',
-      },
+    // Step 1: hit the GitHub API asset endpoint WITHOUT following the redirect.
+    // With Accept: octet-stream it returns a 302 to a signed CDN URL. Authenticate
+    // if a token is configured (anonymous requests from Render's IP get 403'd).
+    const apiHeaders = {
+      Accept: 'application/octet-stream',
+      'User-Agent': 'delsol-api',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    if (GITHUB_TOKEN) apiHeaders.Authorization = `Bearer ${GITHUB_TOKEN}`;
+    const apiRes = await fetch(assetUrl, {
+      redirect: 'manual',
+      headers: apiHeaders,
     });
+
+    // Step 2: follow the redirect to the CDN with a CLEAN request (no Accept /
+    // User-Agent / auth headers). The signed CDN URL already encodes the content
+    // type and disposition; forwarding the API request's headers to the signed
+    // blob URL makes release-assets.githubusercontent.com reject it with 403
+    // (this is why the auto-following fetch failed on Render). A bare GET — like
+    // a browser following a download link — succeeds.
+    let upstream = apiRes;
+    if (apiRes.status >= 300 && apiRes.status < 400) {
+      const location = apiRes.headers.get('location');
+      if (!location) {
+        res.status(502).json({ error: 'GitHub redirect had no Location header.' });
+        return;
+      }
+      upstream = await fetch(location); // no custom headers
+    }
+
     if (!upstream.ok) {
+      const body = await upstream.text().catch(() => '');
       res.status(upstream.status).json({
-        error: `Upstream ${upstream.status}: ${upstream.statusText}`,
+        error: `Upstream ${upstream.status} ${upstream.statusText}`.trim() +
+          (body ? `: ${body.slice(0, 200)}` : ''),
       });
       return;
     }
@@ -96,5 +128,7 @@ app.get('/dl', async (req, res) => {
 
 const port = process.env.PORT || 3001;
 app.listen(port, () => {
-  console.log(`delsol-api listening on :${port}`);
+  console.log(
+    `delsol-api listening on :${port} (github auth: ${GITHUB_TOKEN ? 'on' : 'off'})`,
+  );
 });

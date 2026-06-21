@@ -79,3 +79,10 @@ services:
     startCommand: npm start
     autoDeployTrigger: commit
     healthCheckPath: /healthz
+    envVars:
+      # GitHub token for authenticating release-asset API calls. Anonymous calls
+      # from Render's datacenter IP get 403'd by GitHub; authenticated calls get
+      # 5000/hr. A read-only token for public repos is sufficient. sync: false =
+      # set the value in the Render dashboard (not committed here).
+      - key: GITHUB_TOKEN
+        sync: false
