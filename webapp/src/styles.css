@@ -27,8 +27,9 @@ body {
 #app {
   max-width: 620px;
   margin-inline: auto;
+  /* Bottom padding leaves room for the fixed tab bar (+ iOS home indicator). */
   padding: max(16px, env(safe-area-inset-top)) 16px
-    max(16px, env(safe-area-inset-bottom));
+    calc(72px + env(safe-area-inset-bottom));
 }
 
 header.app-header {
@@ -510,4 +511,127 @@ button:disabled {
   color: var(--on);
   font-size: 14px;
   margin: 8px 0 0;
+}
+
+/* ---- connection bar (persistent, tap to expand) ---- */
+.conn-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  color: var(--text);
+  font-weight: 600;
+}
+.conn-bar-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.conn-bar-device {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conn-bar-chevron {
+  color: var(--muted);
+  flex: none;
+}
+.conn-panel {
+  margin-bottom: 14px;
+}
+.conn-panel .row {
+  margin-top: 6px;
+}
+
+/* ---- tab bar (fixed bottom, thumb-reachable) ---- */
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  /* Solid fallback first; the blur/translucent layer only applies where supported
+     (older Bluefy/WebKit would otherwise render a see-through fixed bar). */
+  background: var(--card);
+  border-top: 1px solid var(--card-border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .tab-bar {
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+}
+.tab-btn {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 8px 4px;
+  width: auto;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+}
+.tab-btn .tab-icon {
+  font-size: 20px;
+  line-height: 1;
+  filter: grayscale(1) opacity(0.7);
+}
+.tab-btn.is-active {
+  color: var(--accent);
+}
+.tab-btn.is-active .tab-icon {
+  filter: none;
+}
+.tab-badge {
+  position: absolute;
+  top: 4px;
+  right: 50%;
+  transform: translateX(14px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--off);
+}
+
+.tab-content {
+  /* panes manage their own visibility */
+}
+#status-card.disconnected h2 {
+  margin-bottom: 6px;
+}
+
+/* ---- error toast ---- */
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 30;
+  max-width: 90%;
+  background: var(--card);
+  border: 1px solid var(--off);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }

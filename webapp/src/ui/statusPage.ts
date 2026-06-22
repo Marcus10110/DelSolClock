@@ -53,6 +53,15 @@ export class StatusPage {
   private fwMount!: HTMLElement;
   private dbgMount!: HTMLElement;
   private probeMount!: HTMLElement;
+  private connBar!: HTMLButtonElement;
+  private connPanel!: HTMLElement;
+  private connChevron!: HTMLElement;
+  private connBarDevice!: HTMLElement;
+  private statusDisconnected!: HTMLElement;
+  private debugBadge!: HTMLElement;
+  private toastEl!: HTMLElement;
+  private activeTab = 'nav';
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.el = document.createElement('div');
@@ -83,25 +92,23 @@ export class StatusPage {
 
   private template(): string {
     return `
-      <header class="app-header">
-        <span class="logo"></span>
-        <h1>Del Sol Clock</h1>
-      </header>
+      <!-- Persistent connection bar: tap to expand controls + details. -->
+      <button class="conn-bar" id="conn-bar" aria-expanded="false">
+        <span class="conn-bar-main">
+          <span class="dot" id="state-dot"></span>
+          <span class="conn-bar-text" id="state-text">Disconnected</span>
+          <span class="conn-bar-device" id="conn-bar-device"></span>
+        </span>
+        <span class="conn-bar-chevron" id="conn-chevron">▾</span>
+      </button>
 
-      <div id="support-banner" class="banner hidden"></div>
-
-      <button id="reconnect" class="hidden">Reconnect</button>
-      <button id="connect">Connect to “Del Sol”</button>
-      <button id="demo" class="secondary">Demo mode (no device)</button>
-      <button id="busy" class="hidden" disabled></button>
-      <button id="disconnect" class="secondary hidden">Disconnect</button>
-
-      <div class="card">
-        <h2>Connection</h2>
-        <div class="row">
-          <span class="k">Status</span>
-          <span class="state-line"><span class="dot" id="state-dot"></span><span class="v" id="state-text">Disconnected</span></span>
-        </div>
+      <div class="conn-panel hidden" id="conn-panel">
+        <div id="support-banner" class="banner hidden"></div>
+        <button id="reconnect" class="hidden">Reconnect</button>
+        <button id="connect">Connect to “Del Sol”</button>
+        <button id="demo" class="secondary">Demo mode (no device)</button>
+        <button id="busy" class="hidden" disabled></button>
+        <button id="disconnect" class="secondary hidden">Disconnect</button>
         <div class="row hidden" id="device-row">
           <span class="k">Device</span><span class="v" id="device-val">${DASH}</span>
         </div>
@@ -110,26 +117,59 @@ export class StatusPage {
         </div>
       </div>
 
-      <div class="card hidden" id="status-card">
-        <h2>Vehicle Status</h2>
-        <div class="row"><span class="k">Rear Window</span><span class="v muted" data-flag="rearWindowDown">${DASH}</span></div>
-        <div class="row"><span class="k">Trunk</span><span class="v muted" data-flag="trunkOpen">${DASH}</span></div>
-        <div class="row"><span class="k">Roof</span><span class="v muted" data-flag="convertibleRoofDown">${DASH}</span></div>
-        <div class="row"><span class="k">Ignition</span><span class="v muted" data-flag="ignitionOn">${DASH}</span></div>
-        <div class="row"><span class="k">Head Lights</span><span class="v muted" data-flag="headlightsOn">${DASH}</span></div>
-        <div class="row"><span class="k">Battery</span><span class="v muted" id="battery-val">${DASH}</span></div>
-        <div class="row"><span class="k">Last update</span><span class="v muted" id="time-val">${DASH}</span></div>
-      </div>
+      <!-- Tab content panes. Exactly one is visible at a time. -->
+      <main class="tab-content">
+        <section class="tab-pane" data-pane="nav">
+          <div id="nav-mount"></div>
+        </section>
 
-      <div id="nav-mount"></div>
-      <div id="fw-mount" class="hidden"></div>
-      <div id="dbg-mount" class="hidden"></div>
-      <div id="probe-mount"></div>
+        <section class="tab-pane hidden" data-pane="status">
+          <div class="card" id="status-card">
+            <h2>Vehicle Status</h2>
+            <div class="row"><span class="k">Rear Window</span><span class="v muted" data-flag="rearWindowDown">${DASH}</span></div>
+            <div class="row"><span class="k">Trunk</span><span class="v muted" data-flag="trunkOpen">${DASH}</span></div>
+            <div class="row"><span class="k">Roof</span><span class="v muted" data-flag="convertibleRoofDown">${DASH}</span></div>
+            <div class="row"><span class="k">Ignition</span><span class="v muted" data-flag="ignitionOn">${DASH}</span></div>
+            <div class="row"><span class="k">Head Lights</span><span class="v muted" data-flag="headlightsOn">${DASH}</span></div>
+            <div class="row"><span class="k">Battery</span><span class="v muted" id="battery-val">${DASH}</span></div>
+            <div class="row"><span class="k">Last update</span><span class="v muted" id="time-val">${DASH}</span></div>
+            <p class="muted-text" id="status-disconnected">Connect to a device to see vehicle status.</p>
+          </div>
+        </section>
 
-      <div class="card">
-        <h2>Log</h2>
-        <div id="log"></div>
-      </div>
+        <section class="tab-pane hidden" data-pane="firmware">
+          <div id="fw-mount"></div>
+        </section>
+
+        <section class="tab-pane hidden" data-pane="debug">
+          <div id="dbg-mount"></div>
+          <div id="probe-mount"></div>
+          <div class="card">
+            <h2>Log</h2>
+            <div id="log"></div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Bottom tab bar (thumb-reachable on phones). -->
+      <nav class="tab-bar" id="tab-bar">
+        <button class="tab-btn is-active" data-tab="nav">
+          <span class="tab-icon">🧭</span><span class="tab-label">Navigate</span>
+        </button>
+        <button class="tab-btn" data-tab="status">
+          <span class="tab-icon">🚗</span><span class="tab-label">Status</span>
+        </button>
+        <button class="tab-btn" data-tab="firmware">
+          <span class="tab-icon">⬆️</span><span class="tab-label">Firmware</span>
+        </button>
+        <button class="tab-btn" data-tab="debug">
+          <span class="tab-icon">🛠️</span><span class="tab-label">Debug</span>
+          <span class="tab-badge hidden" id="debug-badge"></span>
+        </button>
+      </nav>
+
+      <!-- Transient error toast (errors surface even when not on the Debug tab). -->
+      <div class="toast hidden" id="toast"></div>
     `;
   }
 
@@ -153,6 +193,13 @@ export class StatusPage {
     this.fwMount = q('#fw-mount');
     this.dbgMount = q('#dbg-mount');
     this.probeMount = q('#probe-mount');
+    this.connBar = q('#conn-bar');
+    this.connPanel = q('#conn-panel');
+    this.connChevron = q('#conn-chevron');
+    this.connBarDevice = q('#conn-bar-device');
+    this.statusDisconnected = q('#status-disconnected');
+    this.debugBadge = q('#debug-badge');
+    this.toastEl = q('#toast');
     this.logEl = q('#log');
     for (const node of this.el.querySelectorAll<HTMLElement>('[data-flag]')) {
       this.flagEls[node.dataset.flag as string] = node;
@@ -167,6 +214,44 @@ export class StatusPage {
     this.connectBtn.addEventListener('click', () => void this.handleConnect());
     this.demoBtn.addEventListener('click', () => void this.handleDemo());
     this.disconnectBtn.addEventListener('click', () => this.conn?.disconnect());
+
+    // Bottom tab bar: switch the visible content pane.
+    for (const btn of this.el.querySelectorAll<HTMLButtonElement>('.tab-btn')) {
+      btn.addEventListener('click', () => this.switchTab(btn.dataset.tab as string));
+    }
+
+    // Connection bar: tap to expand/collapse the controls + details panel.
+    this.connBar.addEventListener('click', () => this.toggleConnPanel());
+  }
+
+  /** Show one tab pane, hide the rest, and update the active tab-bar button. */
+  private switchTab(tab: string): void {
+    this.activeTab = tab;
+    for (const pane of this.el.querySelectorAll<HTMLElement>('.tab-pane')) {
+      pane.classList.toggle('hidden', pane.dataset.pane !== tab);
+    }
+    for (const btn of this.el.querySelectorAll<HTMLButtonElement>('.tab-btn')) {
+      btn.classList.toggle('is-active', btn.dataset.tab === tab);
+    }
+    // Clear the Debug error badge once the user visits the Debug tab.
+    if (tab === 'debug') this.debugBadge.classList.add('hidden');
+  }
+
+  private toggleConnPanel(force?: boolean): void {
+    const open = force ?? this.connPanel.classList.contains('hidden');
+    this.connPanel.classList.toggle('hidden', !open);
+    this.connBar.setAttribute('aria-expanded', String(open));
+    this.connChevron.textContent = open ? '▴' : '▾';
+  }
+
+  /** Briefly show an error toast (errors are visible even off the Debug tab). */
+  private showToast(message: string): void {
+    this.toastEl.textContent = message;
+    this.toastEl.classList.remove('hidden');
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.toastEl.classList.add('hidden'), 5000);
+    // Flag the Debug tab (where the full log lives) unless already viewing it.
+    if (this.activeTab !== 'debug') this.debugBadge.classList.remove('hidden');
   }
 
   /** Subscribe the UI to a given connection (real or demo), replacing any prior one. */
@@ -266,12 +351,21 @@ export class StatusPage {
     // Disconnect button: only when connected (no lingering spinner — disconnect is instant in our flow)
     this.disconnectBtn.classList.toggle('hidden', !connected);
 
-    // Details (device, firmware, vehicle status, firmware panel) only when connected
+    // Top connection bar: device name + dot reflect state; auto-collapse the
+    // panel once connected (so the user lands on content), auto-open when idle.
+    this.connBarDevice.textContent = connected ? (this.conn?.deviceName ?? '') : '';
     this.deviceRow.classList.toggle('hidden', !connected);
     this.fwRow.classList.toggle('hidden', !connected);
-    this.statusCard.classList.toggle('hidden', !connected);
-    this.fwMount.classList.toggle('hidden', !connected);
-    this.dbgMount.classList.toggle('hidden', !connected);
+
+    // Within-pane content: the tabs are always navigable, but the device-
+    // dependent content shows a hint when disconnected.
+    this.statusCard.classList.toggle('disconnected', !connected);
+    this.statusDisconnected.classList.toggle('hidden', connected);
+    for (const node of this.el.querySelectorAll<HTMLElement>(
+      '#status-card .row',
+    )) {
+      node.classList.toggle('hidden', !connected);
+    }
 
     // Reflect connection state on the panels on EVERY render. This must not clear
     // the connection only in the disconnected branch: during connect, the
@@ -284,8 +378,10 @@ export class StatusPage {
 
     if (connected) {
       this.deviceVal.textContent = this.conn?.deviceName ?? DASH;
+      this.toggleConnPanel(false); // collapse to reveal content
     } else {
       this.resetDetails();
+      if (!busy) this.toggleConnPanel(true); // expand so Connect is visible
     }
   }
 
@@ -329,6 +425,8 @@ export class StatusPage {
   }
 
   private appendLog(level: string, message: string): void {
+    // Surface errors as a toast so they're seen even off the Debug tab.
+    if (level === 'error') this.showToast(message);
     const line = document.createElement('div');
     line.className = `log-${level}`;
     line.textContent = message;
