@@ -42,6 +42,10 @@ struct NavOverlayProps {
   std::string speed;      // current speed, e.g. "34"  (units drawn as a label)
 
   bool showBottomBar{true};
+
+  // Daytime theme (dark ink on light bars) for sunlight legibility; false => the
+  // night theme (light text on black bars with neon chrome).
+  bool daytime{false};
 };
 
 // Draw the overlay over whatever is already on `gfx` (does NOT clear). Call after

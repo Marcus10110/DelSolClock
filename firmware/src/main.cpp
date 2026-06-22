@@ -29,6 +29,7 @@
 #include "quarter_mile.h"
 #include "navigation_service.h"
 #include "matcher.h"
+#include "sun.h"
 #include "logger.h"
 #include "debug_service.h"
 #include "utilities.h"
@@ -476,7 +477,26 @@ void loop()
             // Perspective road + nav data overlay, fed by the live matcher result.
             const auto& route = NavigationService::GetRoute();
 
+            // Day/night palette: auto-switch from the sun's position (GPS gives
+            // UTC time + lat/lng). Recomputed about once a minute; the cached
+            // value persists so a brief GPS gap doesn't flip the palette.
+            static bool nav_daytime = false;
+            static uint32_t last_sun_ms = 0;
+            {
+                auto* g = Gps::GetGps();
+                if( g->location.isValid() && g->date.isValid() && g->time.isValid() &&
+                    ( last_sun_ms == 0 || millis() - last_sun_ms > 60000 ) )
+                {
+                    last_sun_ms = millis();
+                    nav_daytime = Sun::IsDaytime(
+                        g->location.lat(), g->location.lng(), g->date.year(),
+                        g->date.month(), g->date.day(), g->time.hour(),
+                        g->time.minute() );
+                }
+            }
+
             display::PerspectiveProps persp;
+            persp.daytime = nav_daytime;
             persp.maxDrawDistanceM = 200.0f;
             // Heading drives the background skyline pan. Prefer GPS course (valid
             // while moving); leave -1 (skyline off) when course is unknown.
@@ -511,6 +531,7 @@ void loop()
 
             // Build the overlay from the matcher result + GPS speed + wall clock.
             display::NavOverlayProps ov;
+            ov.daytime = nav_daytime;
             if( gNavResult.nextManeuverIndex >= 0 &&
                 gNavResult.nextManeuverIndex < ( int )route.maneuvers.size() )
             {

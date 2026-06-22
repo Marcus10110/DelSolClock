@@ -9,16 +9,50 @@
 namespace display {
 namespace {
 
-// High-contrast palette. The strips are near-black so light text/arrows pop
-// against both the road and the sky. Synthwave-night HUD chrome: a glowing
-// border + dividers around the bars, like a game HUD.
-constexpr uint16_t kStripBg = 0x0000;     // solid black backing
-constexpr uint16_t kStripLine = 0x4208;   // thin separator line (mid grey)
-constexpr uint16_t kFg = 0xFFFF;          // white text/arrows (max contrast)
-constexpr uint16_t kAccent = 0x07FF;      // cyan accent for distance (synthwave)
-constexpr uint16_t kDim = 0xC618;         // light grey for secondary labels
-constexpr uint16_t kChrome = 0xF81F;      // magenta HUD border (glow)
-constexpr uint16_t kChromeDim = 0x6010;   // dim magenta for inner dividers
+// HUD theme: night (light text on a black bar, glowing magenta chrome) and day
+// (dark ink on a light bar) for sunlight legibility. The bars are a solid
+// backing so the text/arrows always have a high-contrast field, never competing
+// with the road/sky behind them.
+struct Theme {
+  uint16_t stripBg;    // bar backing
+  uint16_t stripLine;  // thin separator
+  uint16_t fg;         // primary text/arrows
+  uint16_t accent;     // distance / speed accent
+  uint16_t dim;        // secondary labels
+  uint16_t chrome;     // HUD border
+  uint16_t chromeDim;  // inner dividers
+};
+
+constexpr Theme kNightHud = {
+    0x0000,  // stripBg   — black
+    0x4208,  // stripLine — mid grey
+    0xFFFF,  // fg        — white
+    0x07FF,  // accent    — cyan
+    0xC618,  // dim       — light grey
+    0xF81F,  // chrome    — magenta glow
+    0x6010,  // chromeDim — dim magenta
+};
+
+constexpr Theme kDayHud = {
+    0xEF7D,  // stripBg   — near-white (light bar)
+    0x8410,  // stripLine — mid grey
+    0x0000,  // fg        — black ink
+    0xC000,  // accent    — dark red (distance pops, stays dark for glare)
+    0x4208,  // dim       — dark grey secondary
+    0x300C,  // chrome    — dark navy border
+    0x9CD3,  // chromeDim — soft grey dividers
+};
+
+const Theme* gTh = &kNightHud;
+
+// Back-compat aliases so the existing draw code reads gTh->* via short names.
+#define kStripBg (gTh->stripBg)
+#define kStripLine (gTh->stripLine)
+#define kFg (gTh->fg)
+#define kAccent (gTh->accent)
+#define kDim (gTh->dim)
+#define kChrome (gTh->chrome)
+#define kChromeDim (gTh->chromeDim)
 
 constexpr int16_t kStripH = 34;  // top strip height
 constexpr int16_t kBarH = 16;    // bottom bar height (a touch taller for chrome)
@@ -96,6 +130,7 @@ bool turnAngle(TurnDir d, float& angle) {
 }  // namespace
 
 void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
+  gTh = props.daytime ? &kDayHud : &kNightHud;
   const int16_t W = gfx->width();
 
   // ----- Top strip: arrow + distance + street -----

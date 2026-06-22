@@ -21,6 +21,10 @@ struct CenterlinePoint {
 };
 
 struct PerspectiveProps {
+  // Daytime palette: lightened "daytime synthwave" (bright sky, dark ink) for
+  // sunlight legibility. false => the dark glowing night palette.
+  bool daytime{false};
+
   // Camera / projection tuning (world units in meters).
   float cameraHeightM{3.0f};   // eye height above the road
   float horizonFrac{0.42f};    // horizon line as a fraction of screen height

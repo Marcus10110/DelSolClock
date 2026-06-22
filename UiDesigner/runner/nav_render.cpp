@@ -142,7 +142,7 @@ static display::NavOverlayProps buildOverlay(const nav::RouteSummary& route,
 // into `canvas`. Returns the number of centerline points used (0 => degenerate).
 static size_t RenderAt(GFXcanvas16& canvas, const nav::RouteSummary& route,
                        const std::vector<double>& cum, double distanceM,
-                       float phaseM = 0.0f) {
+                       float phaseM = 0.0f, bool daytime = false) {
   nav::LatLng pos = posAtDistance(route, cum, distanceM);
   nav::CenterlineParams cp;
   cp.aheadMeters = 200.0;  // look farther so 100m-out turns enter view
@@ -160,6 +160,7 @@ static size_t RenderAt(GFXcanvas16& canvas, const nav::RouteSummary& route,
   p.headingDegrees = heading;
   p.centerlinePhaseM = phaseM;
   p.carSpritePath = "/del_sol_sprite_24b.bmp";
+  p.daytime = daytime;
   for (const auto& lp : local) {
     p.centerline.push_back(
         {static_cast<float>(lp.forward), static_cast<float>(lp.right)});
@@ -168,6 +169,7 @@ static size_t RenderAt(GFXcanvas16& canvas, const nav::RouteSummary& route,
   display::DrawPerspective(&canvas, p);
 
   display::NavOverlayProps ov = buildOverlay(route, cum, distanceM);
+  ov.daytime = daytime;
   display::DrawNavOverlay(&canvas, ov);
   return local.size();
 }
@@ -454,5 +456,19 @@ int main(int argc, char** argv) {
   SaveBMP24(fs::path("out") / "nav_all.bmp", grid.getBuffer(), grid.width(),
             grid.height());
   std::printf("Wrote out/nav_all.bmp (%d samples)\n", n);
+
+  // Day-mode review: render a couple of representative samples in the daytime
+  // palette so the day/night looks can be compared.
+  if (!samplesList.empty()) {
+    size_t mid = samplesList.size() / 2;
+    for (size_t s : {size_t(0), mid}) {
+      RenderAt(canvas, route, cum, samplesList[s].distanceM, 0.0f,
+               /*daytime=*/true);
+      char nm[64];
+      std::snprintf(nm, sizeof(nm), "day_%02zu.bmp", s);
+      SaveBMP24(fs::path("out") / nm, canvas.getBuffer(), W, H);
+      std::printf("Wrote out/%s (daytime)\n", nm);
+    }
+  }
   return 0;
 }

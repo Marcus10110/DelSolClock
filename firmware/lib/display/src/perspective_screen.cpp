@@ -9,19 +9,54 @@
 namespace display {
 namespace {
 
-// Synthwave-night palette (RGB565). Dark, high-contrast, glowing — reads well on
-// the cluster display and matches the neon reference art.
-constexpr uint16_t kSky = 0x1009;        // very dark blue-violet (above horizon)
-constexpr uint16_t kSkyHorizon = 0xF81F; // bright magenta horizon seam (glow)
-constexpr uint16_t kGround = 0x0805;     // near-black violet (below horizon)
-constexpr uint16_t kGrid = 0x500A;       // dim magenta perspective grid
-constexpr uint16_t kRoad = 0x18C3;       // dark blue-grey road fill
-constexpr uint16_t kRoadFar = 0x10A2;    // road tint near the horizon (gradient)
-constexpr uint16_t kEdge = 0xF81F;       // glowing magenta road edges
-constexpr uint16_t kCenter = 0x07FF;     // bright cyan centerline dashes
-constexpr uint16_t kCity = 0x2009;       // building silhouette (dark violet)
-constexpr uint16_t kCityTop = 0x4811;    // lit top edge of buildings (dim magenta)
-constexpr uint16_t kWindow = 0xFE60;     // warm-yellow lit windows
+// The perspective view has a day and a night palette (RGB565). Night is the
+// dark glowing synthwave look; day is a lightened "daytime synthwave" — bright
+// sky, lighter road, saturated (not glowing) edges, and DARK ink so it stays
+// legible under sunlight glare on the small cluster display.
+struct Palette {
+  uint16_t sky;         // above the horizon
+  uint16_t skyHorizon;  // bright seam at the horizon line
+  uint16_t ground;      // below the horizon
+  uint16_t grid;        // perspective ground grid
+  uint16_t road;        // near road fill
+  uint16_t roadFar;     // road tint toward the horizon (gradient)
+  uint16_t edge;        // road edge lines
+  uint16_t center;      // centerline dashes
+  uint16_t city;        // building / mountain silhouette
+  uint16_t cityTop;     // lit top edge of buildings
+  uint16_t window;      // lit windows
+};
+
+constexpr Palette kNight = {
+    0x1009,  // sky      — very dark blue-violet
+    0xF81F,  // skyHorizon — bright magenta seam
+    0x0805,  // ground   — near-black violet
+    0x500A,  // grid     — dim magenta
+    0x18C3,  // road     — dark blue-grey
+    0x10A2,  // roadFar  — darker toward horizon
+    0xF81F,  // edge     — glowing magenta
+    0x07FF,  // center   — bright cyan
+    0x2009,  // city     — dark violet
+    0x4811,  // cityTop  — dim magenta
+    0xFE60,  // window   — warm yellow
+};
+
+constexpr Palette kDay = {
+    0x6D5F,  // sky      — bright cyan-blue
+    0xFD8B,  // skyHorizon — warm peach seam (sun haze)
+    0xCE99,  // ground   — pale warm grey
+    0x9CD3,  // grid     — soft blue-grey (subtle on light ground)
+    0x8410,  // road     — mid grey
+    0xA534,  // roadFar  — lighter grey toward horizon (haze)
+    0x300C,  // edge     — dark navy (high contrast on grey)
+    0xFB00,  // center   — saturated orange dashes
+    0x49A6,  // city     — muted slate silhouette (reads vs bright sky)
+    0x39C7,  // cityTop  — slightly darker slate top edge
+    0x2945,  // window   — dark glass (windows read as dark in daylight)
+};
+
+// Active palette for the current draw call (set at each public entry point).
+const Palette* gPal = &kNight;
 
 struct ScreenPt {
   float x;
@@ -223,10 +258,10 @@ void drawSkylineColumn(Adafruit_GFX* gfx, int wrapped, int bx, int colW,
     if (hR < 2) hR = 2;
     // Fill the slice as a quad between this column's height and the next's, so
     // adjacent columns join into a continuous ridge line.
-    gfx->fillTriangle(bx, horizonY - hL, bx, horizonY, bx + colW, horizonY, kCity);
+    gfx->fillTriangle(bx, horizonY - hL, bx, horizonY, bx + colW, horizonY, gPal->city);
     gfx->fillTriangle(bx, horizonY - hL, bx + colW, horizonY - hR,
-                      bx + colW, horizonY, kCity);
-    gfx->drawLine(bx, horizonY - hL, bx + colW, horizonY - hR, kCityTop);
+                      bx + colW, horizonY, gPal->city);
+    gfx->drawLine(bx, horizonY - hL, bx + colW, horizonY - hR, gPal->cityTop);
     return;
   }
 
@@ -265,24 +300,24 @@ void drawSkylineColumn(Adafruit_GFX* gfx, int wrapped, int bx, int colW,
   const int by = horizonY - bh;
 
   if (pyramid) {
-    gfx->fillTriangle(bx2 + bw / 2, by, bx2, horizonY, bx2 + bw, horizonY, kCity);
-    gfx->drawLine(bx2 + bw / 2, by, bx2, horizonY, kCityTop);
-    gfx->drawLine(bx2 + bw / 2, by, bx2 + bw, horizonY, kCityTop);
+    gfx->fillTriangle(bx2 + bw / 2, by, bx2, horizonY, bx2 + bw, horizonY, gPal->city);
+    gfx->drawLine(bx2 + bw / 2, by, bx2, horizonY, gPal->cityTop);
+    gfx->drawLine(bx2 + bw / 2, by, bx2 + bw, horizonY, gPal->cityTop);
     return;
   }
 
-  gfx->fillRect(bx2, by, bw, bh, kCity);
-  gfx->drawFastHLine(bx2, by, bw, kCityTop);
+  gfx->fillRect(bx2, by, bw, bh, gPal->city);
+  gfx->drawFastHLine(bx2, by, bw, gPal->cityTop);
   if (tower) {  // rounded-ish top: clip the corners
-    gfx->drawPixel(bx2, by, kCity);
-    gfx->drawPixel(bx2 + bw - 1, by, kCity);
+    gfx->drawPixel(bx2, by, gPal->city);
+    gfx->drawPixel(bx2 + bw - 1, by, gPal->city);
   }
 
   // Scatter a few lit windows, deterministic per building.
   for (int wy = by + 2; wy < horizonY - 1; wy += 3) {
     for (int wx = bx2 + 1; wx < bx2 + bw - 1; wx += 2) {
       if (hash01(wrapped * 131 + wy * 17 + wx) > 0.62f) {
-        gfx->drawPixel(wx, wy, kWindow);
+        gfx->drawPixel(wx, wy, gPal->window);
       }
     }
   }
@@ -322,34 +357,35 @@ void drawGrid(Adafruit_GFX* gfx, int16_t W, int16_t H, int16_t centerX,
     if (gx == 0) continue;  // center is the road; skip
     const float worldX = gx * 3.0f;  // meters left/right of center
     const float bx = centerX + (worldX / nearZ) * p.focalPx;  // x at bottom edge
-    gfx->drawLine(centerX, horizonY, static_cast<int>(bx + 0.5f), H - 1, kGrid);
+    gfx->drawLine(centerX, horizonY, static_cast<int>(bx + 0.5f), H - 1, gPal->grid);
   }
   // Horizontal lines at increasing ground distances. Start a little out from the
   // horizon so they don't merge into a muddy band right at the vanishing point.
   for (float z = 6.0f; z <= 120.0f; z *= 1.6f) {
     int y = static_cast<int>(horizonY + p.cameraHeightM * p.focalPx / z + 0.5f);
-    if (y > horizonY + 2 && y < H) gfx->drawFastHLine(0, y, W, kGrid);
+    if (y > horizonY + 2 && y < H) gfx->drawFastHLine(0, y, W, gPal->grid);
   }
 }
 
 }  // namespace
 
 void DrawPerspective(Adafruit_GFX* gfx, const PerspectiveProps& props) {
+  gPal = props.daytime ? &kDay : &kNight;
   Clear(gfx);
   const int16_t W = gfx->width();
   const int16_t H = gfx->height();
   const int16_t centerX = W / 2;
   const int16_t horizonY = static_cast<int16_t>(H * props.horizonFrac);
 
-  gfx->fillRect(0, 0, W, horizonY, kSky);
-  gfx->fillRect(0, horizonY, W, H - horizonY, kGround);
+  gfx->fillRect(0, 0, W, horizonY, gPal->sky);
+  gfx->fillRect(0, horizonY, W, H - horizonY, gPal->ground);
   // Background city skyline in the sky band, panned by heading. The top ~36px is
   // covered by the HUD strip, so start the skyline below that.
   if (props.headingDegrees >= 0.0f) {
     drawSkyline(gfx, W, /*topInset=*/36, horizonY, props.headingDegrees);
   }
   // A thin bright line right at the horizon (the synthwave "glow" seam).
-  gfx->drawFastHLine(0, horizonY, W, kSkyHorizon);
+  gfx->drawFastHLine(0, horizonY, W, gPal->skyHorizon);
   drawGrid(gfx, W, H, centerX, horizonY, props);
 
   const std::vector<CenterlinePoint> centerline = withNearEdge(
@@ -395,17 +431,17 @@ void DrawPerspective(Adafruit_GFX* gfx, const PerspectiveProps& props) {
       // A general convex-quad fill (not a Y-slice trapezoid) so near-horizontal
       // slices still render. Corners wound around the perimeter:
       //   prevL -> l (far left) -> r (far right) -> prevR (near right) -> prevL.
-      // Tint shifts toward kRoadFar with distance for a subtle gradient.
+      // Tint shifts toward gPal->roadFar with distance for a subtle gradient.
       const uint16_t fill =
-          c.forward > props.maxDrawDistanceM * 0.45f ? kRoadFar : kRoad;
+          c.forward > props.maxDrawDistanceM * 0.45f ? gPal->roadFar : gPal->road;
       const Vec2 quad[4] = {{prevL.x, prevL.y}, {l.x, l.y},
                             {r.x, r.y}, {prevR.x, prevR.y}};
       fillQuad(gfx, quad, fill);
       // Road boundary = the two LONG sides (left rail prevL->l, right rail
       // prevR->r). These always follow the road, so they never float free the
       // way a far->near cross-link could.
-      gfx->drawLine((int)prevL.x, (int)prevL.y, (int)l.x, (int)l.y, kEdge);
-      gfx->drawLine((int)prevR.x, (int)prevR.y, (int)r.x, (int)r.y, kEdge);
+      gfx->drawLine((int)prevL.x, (int)prevL.y, (int)l.x, (int)l.y, gPal->edge);
+      gfx->drawLine((int)prevR.x, (int)prevR.y, (int)r.x, (int)r.y, gPal->edge);
       // Cyan dashed centerline. Subdivide this segment in WORLD distance (finer
       // than the ~4 m centerline samples) so the dashes have enough resolution
       // to read as dashes; key each sub-step's on/off to its world distance +
@@ -432,7 +468,7 @@ void DrawPerspective(Adafruit_GFX* gfx, const PerspectiveProps& props) {
                   (static_cast<int>(std::floor(prevS / kDashPeriodM)) & 1) == 0;
               if (on) {
                 gfx->drawLine((int)prevPt.x, (int)prevPt.y, (int)pt.x, (int)pt.y,
-                              kCenter);
+                              gPal->center);
               }
             }
             prevPt = pt;
@@ -463,16 +499,17 @@ void DrawPerspective(Adafruit_GFX* gfx, const PerspectiveProps& props) {
 int PanoramaWidth() { return kSkylineCols * kSkylineColW; }
 
 void DrawSkylinePanorama(Adafruit_GFX* gfx, int16_t horizonY) {
+  gPal = &kNight;  // panorama review uses the night palette
   const int16_t W = gfx->width();
   const int16_t H = gfx->height();
   const int bandH = horizonY;  // buildings rest at horizonY, rise to the top
-  gfx->fillRect(0, 0, W, H, kSky);
-  gfx->fillRect(0, horizonY, W, H - horizonY, kGround);
+  gfx->fillRect(0, 0, W, H, gPal->sky);
+  gfx->fillRect(0, horizonY, W, H - horizonY, gPal->ground);
   for (int col = 0; col < kSkylineCols; ++col) {
     drawSkylineColumn(gfx, col, col * kSkylineColW, kSkylineColW, horizonY,
                       bandH);
   }
-  gfx->drawFastHLine(0, horizonY, W, kSkyHorizon);
+  gfx->drawFastHLine(0, horizonY, W, gPal->skyHorizon);
 }
 
 }  // namespace display
