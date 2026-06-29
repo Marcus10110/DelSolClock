@@ -9,11 +9,13 @@ import type {
   CrashDumpStatus,
   DebugCommand,
   FirmwareUpdateProgress,
+  GpsRecStatus,
   IConnection,
 } from './iconnection';
 import type { ConnectionState, VehicleStatus } from './types';
 import type { UploadProgress } from '../navigation/routeUpload';
 import type { RouteSummary } from '../navigation/types';
+import { encodeGpsTrace, type GpsSample } from '../navigation/gpsTrace';
 
 const DEMO_FW_VERSION = 'demo-1.0.0';
 // A plausible-looking SPIFFS hash so the firmware panel's match UI has something
@@ -178,6 +180,50 @@ export class DemoConnection extends Emitter<ConnectionEvents> implements IConnec
     this.log('ok', 'Route uploaded (demo).');
   }
 
+  // --- GPS recorder simulation ---
+  private demoGpsRecording = false;
+
+  async gpsRecGetStatus(): Promise<GpsRecStatus> {
+    await delay(80);
+    const samples = buildDemoTrace();
+    // Report counts as if a session had been captured; chunkCount is 0 until a
+    // download is armed (matches the firmware, which fills it on arm).
+    return {
+      recording: this.demoGpsRecording,
+      recordCount: samples.length,
+      byteCount: encodeGpsTrace(samples).length - 20, // minus the header
+      dropped: 0,
+      chunkCount: 0,
+    };
+  }
+
+  async gpsRecStart(): Promise<void> {
+    await delay(80);
+    this.demoGpsRecording = true;
+    this.log('ok', 'GPS recording started (demo).');
+  }
+
+  async gpsRecStop(): Promise<void> {
+    await delay(80);
+    this.demoGpsRecording = false;
+    this.log('ok', 'GPS recording stopped (demo).');
+  }
+
+  async downloadGpsRecording(
+    onProgress: (percent: number) => void,
+  ): Promise<Uint8Array> {
+    this.demoGpsRecording = false; // arming stops recording, like the firmware
+    const data = encodeGpsTrace(buildDemoTrace());
+    // Simulate a few chunk reads for the progress bar.
+    const chunks = Math.max(1, Math.ceil(data.length / 510));
+    for (let i = 0; i < chunks; i++) {
+      await delay(40);
+      onProgress(Math.round(((i + 1) * 100) / chunks));
+    }
+    this.log('ok', `GPS recording downloaded: ${data.length} bytes (demo).`);
+    return data;
+  }
+
   private emitFrame(): void {
     const base = SCRIPT[this.step % SCRIPT.length];
     this.step += 1;
@@ -215,4 +261,57 @@ function delay(ms: number): Promise<void> {
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
+}
+
+// A short synthetic GPS trace: a moving fix, then a ~3s no-fix outage (sats drop
+// to 0), then it reacquires. Exercises the decoder, CSV/GeoJSON, and the panel
+// with both fix and no-fix rows.
+function buildDemoTrace(): GpsSample[] {
+  const samples: GpsSample[] = [];
+  const baseLat = 37.7749;
+  const baseLng = -122.4194;
+  for (let i = 0; i < 30; i++) {
+    const millis = 10_000 + i * 1000;
+    const outage = i >= 12 && i < 15; // a 3-cycle signal dropout
+    if (outage) {
+      samples.push({
+        millis,
+        hasFix: false,
+        satsUsed: 0,
+        satsInView: i === 13 ? 2 : 3,
+        fixQuality: 0,
+        hdop: null,
+        csumFailsDelta: i === 13 ? 4 : 1,
+        lat: null,
+        lng: null,
+        altM: null,
+        speedMps: null,
+        courseDeg: null,
+        gpsTimeOfDay: null,
+        dateValid: true,
+      });
+      continue;
+    }
+    // drift roughly north-east at ~13 m/s
+    const lat = baseLat + i * 0.00012;
+    const lng = baseLng + i * 0.00010;
+    const hhmmss = 173000 + i; // 17:30:xx-ish UTC, hhmmsscc
+    samples.push({
+      millis,
+      hasFix: true,
+      satsUsed: 8,
+      satsInView: 11,
+      fixQuality: 1,
+      hdop: 0.9 + (i % 3) * 0.1,
+      csumFailsDelta: 0,
+      lat,
+      lng,
+      altM: 52 + i * 0.2,
+      speedMps: 13 + Math.sin(i / 4),
+      courseDeg: 45,
+      gpsTimeOfDay: hhmmss * 100,
+      dateValid: true,
+    });
+  }
+  return samples;
 }

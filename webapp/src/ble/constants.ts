@@ -34,6 +34,17 @@ export const CHR_DEBUG_DATA = '2969eccf-48f1-4069-a662-1ae77fe69118'; // R   [u1
 export const CHR_DEBUG_CONTROL = '65376e10-7797-435b-ac52-14ac0fab362c'; // W   "REBOOT"|"CLEAR"|"PRINT"|"ASSERT"|"ASSERT_LATER"
 export const CHR_DEBUG_BEZEL = '9a8b6f12-5d3e-4c7a-bf21-0e9d4c8a1b76'; // R/W  4 signed bytes [top,bottom,left,right] display bezel insets
 
+// GPS recorder (records one fix-or-no-fix record per NMEA cycle into a RAM ring
+// buffer for off-device drift/outage analysis).
+export const CHR_GPSREC_CONTROL = 'b4e2a1c0-9f3d-4a7e-8c52-1d6b0f93a27e'; // W   1 byte: 0x01 start, 0x02 stop, 0x03 arm-download
+export const CHR_GPSREC_STATUS = 'c5f3b2d1-a04e-4b8f-9d63-2e7c1a04b38f'; // R   LE: u8 recording, u32 recordCount, u32 byteCount, u32 dropped, u32 chunkCount
+export const CHR_GPSREC_DATA = 'd602c3e2-b15f-4c90-ae74-3f8d2b15c490'; // R   [u16 LE index][<=510 bytes], pointer auto-advances (armed snapshot)
+
+// GPS recorder control bytes
+export const GPSREC_CMD_START = 0x01;
+export const GPSREC_CMD_STOP = 0x02;
+export const GPSREC_CMD_ARM_DOWNLOAD = 0x03;
+
 // Navigation service characteristic
 export const CHR_NAV_ROUTE = 'b9f0a2d1-6c3e-4a8b-9d27-1f5c0e6a4b30'; // W-NR/N  512-byte route chunks; notifies continue/success/error
 

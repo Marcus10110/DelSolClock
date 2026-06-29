@@ -14,11 +14,17 @@ import {
   CHR_DEBUG_STATUS,
   CHR_FW_VERSION,
   CHR_FW_WRITE,
+  CHR_GPSREC_CONTROL,
+  CHR_GPSREC_DATA,
+  CHR_GPSREC_STATUS,
   CHR_STATUS,
   FIRMWARE_CHUNK_SIZE,
   FW_CMD_WRITE_APP,
   FW_CMD_WRITE_SPIFFS,
   FW_HEADER_SIZE,
+  GPSREC_CMD_ARM_DOWNLOAD,
+  GPSREC_CMD_START,
+  GPSREC_CMD_STOP,
   OTA_NOTIFY_TIMEOUT_MS,
   SVC_DEBUG,
   SVC_FIRMWARE,
@@ -37,6 +43,7 @@ import type {
   CrashDumpStatus,
   DebugCommand,
   FirmwareUpdateProgress,
+  GpsRecStatus,
   IConnection,
 } from './iconnection';
 import { uploadRouteOverServer } from '../navigation/routeUpload';
@@ -563,6 +570,87 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
       { onProgress, onLog: (m) => this.log('info', m) },
     );
     this.log('ok', 'Route uploaded.');
+  }
+
+  /** Read the GPS recorder status (LE: u8 recording, u32×4 counts). */
+  async gpsRecGetStatus(): Promise<GpsRecStatus> {
+    if (!this.server) throw new Error('Not connected.');
+    const svc = await this.server.getPrimaryService(SVC_DEBUG);
+    const chr = await svc.getCharacteristic(CHR_GPSREC_STATUS);
+    const v = await chr.readValue();
+    if (v.byteLength < 17) throw new Error('GPS recorder status read too short.');
+    return {
+      recording: v.getUint8(0) !== 0,
+      recordCount: v.getUint32(1, true),
+      byteCount: v.getUint32(5, true),
+      dropped: v.getUint32(9, true),
+      chunkCount: v.getUint32(13, true),
+    };
+  }
+
+  private async gpsRecControl(command: number): Promise<void> {
+    if (!this.server) throw new Error('Not connected.');
+    const svc = await this.server.getPrimaryService(SVC_DEBUG);
+    const chr = await svc.getCharacteristic(CHR_GPSREC_CONTROL);
+    await chr.writeValue(new Uint8Array([command]));
+  }
+
+  async gpsRecStart(): Promise<void> {
+    await this.gpsRecControl(GPSREC_CMD_START);
+    this.log('ok', 'GPS recording started.');
+  }
+
+  async gpsRecStop(): Promise<void> {
+    await this.gpsRecControl(GPSREC_CMD_STOP);
+    this.log('ok', 'GPS recording stopped.');
+  }
+
+  /**
+   * Arm the snapshot (stops recording), read the resulting chunk count, then
+   * read each [u16 LE index][payload] slice sequentially — the same mechanism
+   * as the crash dump.
+   */
+  async downloadGpsRecording(
+    onProgress: (percent: number) => void,
+  ): Promise<Uint8Array> {
+    if (!this.server) throw new Error('Not connected.');
+    // Arm: this stops recording and snapshots the buffer on the device.
+    await this.gpsRecControl(GPSREC_CMD_ARM_DOWNLOAD);
+    const status = await this.gpsRecGetStatus();
+    const chunkCount = status.chunkCount;
+    if (chunkCount <= 0) {
+      this.log('info', 'GPS recording is empty.');
+      return new Uint8Array(0);
+    }
+
+    const svc = await this.server.getPrimaryService(SVC_DEBUG);
+    const chr = await svc.getCharacteristic(CHR_GPSREC_DATA);
+
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    for (let expected = 0; expected < chunkCount; expected++) {
+      const view = await chr.readValue();
+      if (view.byteLength < 2) {
+        throw new Error(`Invalid GPS chunk at index ${expected} (too short).`);
+      }
+      const index = view.getUint16(0, /* littleEndian */ true);
+      if (index !== expected) {
+        throw new Error(`GPS chunk index mismatch: expected ${expected}, got ${index}.`);
+      }
+      const payload = new Uint8Array(view.buffer, view.byteOffset + 2, view.byteLength - 2);
+      chunks.push(payload.slice());
+      totalBytes += payload.length;
+      onProgress(Math.round(((expected + 1) * 100) / chunkCount));
+    }
+
+    const result = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const c of chunks) {
+      result.set(c, offset);
+      offset += c.length;
+    }
+    this.log('ok', `GPS recording downloaded: ${totalBytes} bytes.`);
+    return result;
   }
 
   private cleanup(): void {

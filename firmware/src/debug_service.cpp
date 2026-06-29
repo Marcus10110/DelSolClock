@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "utilities.h"
 #include "display_config.h"
+#include "gps_recorder.h"
 
 #include "BLE2902.h"
 #include <BLEServer.h>
@@ -11,6 +12,7 @@
 #include "esp_err.h"
 
 #include <atomic>
+#include <vector>
 
 #define DEBUG_SERVICE_UUID "2b0caa53-e543-4bb0-8f7f-50d1c64aa0dd"
 #define DEBUG_STATUS_CHARACTERISTIC_UUID "32a18dc5-fdda-4601-b5b7-dc2920ac3f37"
@@ -18,6 +20,15 @@
 #define DEBUG_CONTROL_CHARACTERISTIC_UUID "65376e10-7797-435b-ac52-14ac0fab362c"
 // Bezel offsets (read+write): 4 signed bytes [top, bottom, left, right].
 #define DEBUG_BEZEL_CHARACTERISTIC_UUID "9a8b6f12-5d3e-4c7a-bf21-0e9d4c8a1b76"
+// GPS recorder control (write): 1 byte command
+//   0x01 = start, 0x02 = stop, 0x03 = arm download (snapshot + chunk the buffer).
+#define DEBUG_GPSREC_CONTROL_CHARACTERISTIC_UUID "b4e2a1c0-9f3d-4a7e-8c52-1d6b0f93a27e"
+// GPS recorder status (read): packed LE
+//   u8 recording, u32 recordCount, u32 byteCount, u32 dropped, u32 chunkCount.
+#define DEBUG_GPSREC_STATUS_CHARACTERISTIC_UUID "c5f3b2d1-a04e-4b8f-9d63-2e7c1a04b38f"
+// GPS recorder data (read): sequential [u16 LE chunkIndex][<=510 bytes], the
+// armed snapshot, auto-advancing pointer (same mechanism as the crash dump).
+#define DEBUG_GPSREC_DATA_CHARACTERISTIC_UUID "d602c3e2-b15f-4c90-ae74-3f8d2b15c490"
 
 namespace DebugService
 {
@@ -27,6 +38,9 @@ namespace DebugService
         BLECharacteristic* DebugDataCharacteristic = nullptr;
         BLECharacteristic* DebugControlCharacteristic = nullptr;
         BLECharacteristic* DebugBezelCharacteristic = nullptr;
+        BLECharacteristic* GpsRecControlCharacteristic = nullptr;
+        BLECharacteristic* GpsRecStatusCharacteristic = nullptr;
+        BLECharacteristic* GpsRecDataCharacteristic = nullptr;
 
         // Pack the current bezel offsets into the characteristic value.
         void PublishBezel()
@@ -223,6 +237,110 @@ namespace DebugService
 
         DebugBezelCallbacks DebugBezelCB;
 
+        // --- GPS recorder download ---------------------------------------
+        // The armed snapshot of the recording, sliced for sequential reads
+        // exactly like the crash dump. Armed by control command 0x03.
+        std::vector<uint8_t> GpsRecSnapshot;
+        uint8_t GpsRecSlice[ 512 ] = { 0 };
+        int GpsRecCurrentSlice = 0;
+        int GpsRecSliceCount = 0;
+
+        // Pack the current recorder status into the status characteristic.
+        // Layout (LE): u8 recording, u32 recordCount, u32 byteCount,
+        //              u32 dropped, u32 chunkCount.
+        void PublishGpsRecStatus()
+        {
+            uint8_t buf[ 17 ];
+            buf[ 0 ] = GpsRecorder::IsRecording() ? 1 : 0;
+            auto put32 = []( uint8_t* p, uint32_t v ) {
+                p[ 0 ] = v & 0xFF;
+                p[ 1 ] = ( v >> 8 ) & 0xFF;
+                p[ 2 ] = ( v >> 16 ) & 0xFF;
+                p[ 3 ] = ( v >> 24 ) & 0xFF;
+            };
+            put32( &buf[ 1 ], ( uint32_t )GpsRecorder::RecordCount() );
+            put32( &buf[ 5 ], ( uint32_t )GpsRecorder::ByteCount() );
+            put32( &buf[ 9 ], ( uint32_t )GpsRecorder::DroppedRecords() );
+            put32( &buf[ 13 ], ( uint32_t )GpsRecSliceCount );
+            GpsRecStatusCharacteristic->setValue( buf, sizeof( buf ) );
+        }
+
+        void WriteGpsRecSliceToCharacteristic( int slice )
+        {
+            int start = slice * ( int )SliceSize;
+            int len = ( int )std::min( SliceSize, GpsRecSnapshot.size() - ( size_t )start );
+            if( len <= 0 ) return;
+            GpsRecSlice[ 0 ] = slice & 0xFF;
+            GpsRecSlice[ 1 ] = ( slice >> 8 ) & 0xFF;
+            memcpy( &GpsRecSlice[ 2 ], &GpsRecSnapshot[ start ], len );
+            GpsRecDataCharacteristic->setValue( GpsRecSlice, len + 2 );
+        }
+
+        // Snapshot the buffered recording (recording is stopped first so the
+        // buffer is stable) and compute the chunk count.
+        void ArmGpsRecDownload()
+        {
+            GpsRecorder::Stop();  // freeze the buffer for a consistent download
+            GpsRecorder::SnapshotForDownload( GpsRecSnapshot );
+            GpsRecCurrentSlice = 0;
+            GpsRecSliceCount = ( int )GetSliceCount( GpsRecSnapshot.size() );
+            LOG_INFO( "GpsRecorder: armed download, %u bytes, %d slices",
+                      ( unsigned )GpsRecSnapshot.size(), GpsRecSliceCount );
+            // Seed the first slice so an immediate read returns slice 0.
+            if( GpsRecSliceCount > 0 )
+            {
+                WriteGpsRecSliceToCharacteristic( GpsRecCurrentSlice );
+            }
+        }
+
+        class GpsRecControlCallbacks : public BLECharacteristicCallbacks
+        {
+            void onWrite( BLECharacteristic* pCharacteristic, esp_ble_gatts_cb_param_t* param ) override
+            {
+                std::string v = pCharacteristic->getValue();
+                if( v.empty() ) return;
+                switch( ( uint8_t )v[ 0 ] )
+                {
+                case 0x01:
+                    LOG_INFO( "GpsRecorder: start command" );
+                    GpsRecorder::Start();
+                    break;
+                case 0x02:
+                    LOG_INFO( "GpsRecorder: stop command" );
+                    GpsRecorder::Stop();
+                    break;
+                case 0x03:
+                    LOG_INFO( "GpsRecorder: arm-download command" );
+                    ArmGpsRecDownload();
+                    break;
+                default:
+                    LOG_WARN( "GpsRecorder: unknown control byte 0x%02X", ( uint8_t )v[ 0 ] );
+                    break;
+                }
+                PublishGpsRecStatus();
+            }
+        };
+
+        GpsRecControlCallbacks GpsRecControlCB;
+
+        class GpsRecDataCallbacks : public BLECharacteristicCallbacks
+        {
+            void onRead( BLECharacteristic* pCharacteristic, esp_ble_gatts_cb_param_t* param ) override
+            {
+                if( GpsRecCurrentSlice < GpsRecSliceCount )
+                {
+                    WriteGpsRecSliceToCharacteristic( GpsRecCurrentSlice );
+                    GpsRecCurrentSlice++;
+                    if( GpsRecCurrentSlice >= GpsRecSliceCount )
+                    {
+                        GpsRecCurrentSlice = 0;  // wrap so a re-download can restart
+                    }
+                }
+            }
+        };
+
+        GpsRecDataCallbacks GpsRecDataCB;
+
     }
 
 
@@ -254,6 +372,22 @@ namespace DebugService
         DebugBezelCharacteristic->addDescriptor( new BLE2902() );
         DebugBezelCharacteristic->setCallbacks( &DebugBezelCB );
         PublishBezel();  // seed with the persisted values so a read returns them
+
+        LOG_TRACE( "creating gps recorder characteristics" );
+        GpsRecControlCharacteristic = debug_service->createCharacteristic(
+            DEBUG_GPSREC_CONTROL_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_WRITE );
+        GpsRecControlCharacteristic->addDescriptor( new BLE2902() );
+        GpsRecControlCharacteristic->setCallbacks( &GpsRecControlCB );
+
+        GpsRecStatusCharacteristic = debug_service->createCharacteristic(
+            DEBUG_GPSREC_STATUS_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ );
+        GpsRecStatusCharacteristic->addDescriptor( new BLE2902() );
+
+        GpsRecDataCharacteristic = debug_service->createCharacteristic(
+            DEBUG_GPSREC_DATA_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ );
+        GpsRecDataCharacteristic->addDescriptor( new BLE2902() );
+        GpsRecDataCharacteristic->setCallbacks( &GpsRecDataCB );
+        PublishGpsRecStatus();  // seed an idle status
 
         size_t core_size = 0;
         bool has_core = CoreDumpIsAvailable( &core_size );

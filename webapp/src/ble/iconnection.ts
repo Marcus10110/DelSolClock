@@ -53,6 +53,17 @@ export interface BezelOffsets {
   right: number;
 }
 
+/** Live status of the on-device GPS recorder. */
+export interface GpsRecStatus {
+  recording: boolean;
+  recordCount: number;
+  byteCount: number;
+  /** Whole records dropped due to ring-buffer overrun (newest kept). */
+  dropped: number;
+  /** Chunk count of the armed download snapshot (0 until arm-download). */
+  chunkCount: number;
+}
+
 export interface IConnection extends Emitter<ConnectionEvents> {
   readonly state: ConnectionState;
   readonly isConnected: boolean;
@@ -106,4 +117,23 @@ export interface IConnection extends Emitter<ConnectionEvents> {
     summary: RouteSummary,
     onProgress?: (p: UploadProgress) => void,
   ): Promise<void>;
+
+  /** Read the on-device GPS recorder status (recording?, counts, chunkCount). */
+  gpsRecGetStatus(): Promise<GpsRecStatus>;
+
+  /** Start GPS recording (clears the device buffer first). */
+  gpsRecStart(): Promise<void>;
+
+  /** Stop GPS recording (buffer is retained for download). */
+  gpsRecStop(): Promise<void>;
+
+  /**
+   * Download the recorded GPS trace as raw bytes: arms the snapshot on the
+   * device (stops recording), then reads it back via sequential chunk reads.
+   * Reports 0–100 progress. Returns the raw DSGPS binary (decode with
+   * decodeGpsTrace).
+   */
+  downloadGpsRecording(
+    onProgress: (percent: number) => void,
+  ): Promise<Uint8Array>;
 }

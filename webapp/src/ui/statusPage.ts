@@ -18,6 +18,7 @@ import { DebugPanel } from './debugPanel';
 import { NavigationPanel } from './navigationPanel';
 import { BleProbePanel } from './bleProbePanel';
 import { BezelPanel } from './bezelPanel';
+import { GpsRecorderPanel } from './gpsRecorderPanel';
 
 const DASH = '--';
 
@@ -30,6 +31,7 @@ export class StatusPage {
   private readonly navigationPanel = new NavigationPanel();
   private readonly bleProbePanel = new BleProbePanel();
   private readonly bezelPanel = new BezelPanel();
+  private readonly gpsRecorderPanel = new GpsRecorderPanel();
 
   // A previously-granted device we can reconnect to without the picker.
   private knownDevice: BluetoothDevice | null = null;
@@ -56,6 +58,7 @@ export class StatusPage {
   private dbgMount!: HTMLElement;
   private probeMount!: HTMLElement;
   private bezelMount!: HTMLElement;
+  private gpsRecMount!: HTMLElement;
   private connBar!: HTMLButtonElement;
   private connPanel!: HTMLElement;
   private connChevron!: HTMLElement;
@@ -75,6 +78,7 @@ export class StatusPage {
     this.dbgMount.appendChild(this.debugPanel.el);
     this.probeMount.appendChild(this.bleProbePanel.el);
     this.bezelMount.appendChild(this.bezelPanel.el);
+    this.gpsRecMount.appendChild(this.gpsRecorderPanel.el);
     this.wireEvents();
     this.checkSupport();
     this.render('disconnected');
@@ -147,6 +151,7 @@ export class StatusPage {
 
         <section class="tab-pane hidden" data-pane="debug">
           <div id="dbg-mount"></div>
+          <div id="gpsrec-mount"></div>
           <div id="bezel-mount"></div>
           <div id="probe-mount"></div>
           <div class="card">
@@ -199,6 +204,7 @@ export class StatusPage {
     this.dbgMount = q('#dbg-mount');
     this.probeMount = q('#probe-mount');
     this.bezelMount = q('#bezel-mount');
+    this.gpsRecMount = q('#gpsrec-mount');
     this.connBar = q('#conn-bar');
     this.connPanel = q('#conn-panel');
     this.connChevron = q('#conn-chevron');
@@ -275,6 +281,7 @@ export class StatusPage {
       conn.on('firmwareVersion', (v) => {
         this.fwVal.textContent = v || DASH;
         this.debugPanel.setFirmwareVersion(v);
+        this.gpsRecorderPanel.setFirmwareVersion(v);
       }),
       conn.on('firmwareInfo', (info) => {
         this.firmwarePanel.setDeviceInfo(info);
@@ -288,6 +295,7 @@ export class StatusPage {
     this.debugPanel.setConnection(conn);
     this.navigationPanel.setConnection(conn);
     this.bezelPanel.setConnection(conn);
+    this.gpsRecorderPanel.setConnection(conn);
   }
 
   private checkSupport(): void {
@@ -383,6 +391,7 @@ export class StatusPage {
     this.firmwarePanel.setConnection(connected ? this.conn : null);
     this.debugPanel.setConnection(connected ? this.conn : null);
     this.bezelPanel.setConnection(connected ? this.conn : null);
+    this.gpsRecorderPanel.setConnection(connected ? this.conn : null);
 
     if (connected) {
       this.deviceVal.textContent = this.conn?.deviceName ?? DASH;

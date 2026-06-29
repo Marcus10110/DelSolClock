@@ -24,6 +24,7 @@
 #include "car_io.h"
 #include "bluetooth.h"
 #include "gps.h"
+#include "gps_recorder.h"
 #include "ble_ota.h"
 #include "motion.h"
 #include "demo.h"
@@ -119,6 +120,7 @@ void setup()
     }
 
     Gps::Begin();
+    GpsRecorder::Begin();
     Motion::Begin();
     {
         const char* images_to_preload[] = { "/bluetooth.bmp", "/light_small.bmp", "/light_large.bmp", "/left.bmp", "/right.bmp" };
@@ -283,6 +285,13 @@ void loop()
     }
     Bluetooth::Service();
     Gps::Service();
+    // Record one GPS sample per NMEA cycle (fix or not) when recording is armed.
+    // time.isUpdated() fires once per cycle and self-clears; nothing else reads
+    // it, so this captures exactly one record per second.
+    if( Gps::GetGps()->time.isUpdated() )
+    {
+        GpsRecorder::OnGpsCycle();
+    }
     CarIO::Service();
 
     // When a new route is downloaded, auto-switch to the Navigation screen so the

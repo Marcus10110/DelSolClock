@@ -411,6 +411,24 @@ button:disabled {
   margin-top: 8px;
 }
 
+/* ---- GPS recorder panel ---- */
+.gpsrec-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.gpsrec-actions button {
+  width: auto;
+  flex: 1;
+  margin: 0;
+}
+#gpsrec-progress {
+  margin-top: 8px;
+}
+#gpsrec-status {
+  margin-top: 8px;
+}
+
 /* ---- BLE probe panel ---- */
 .probe-log {
   font: 11px/1.4 ui-monospace, Menlo, monospace;
