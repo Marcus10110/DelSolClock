@@ -22,13 +22,15 @@ void DrawPair(Adafruit_GFX* gfx, const char* title, const char* value, int x,
   gfx->write(value);
 }
 
-void DrawProgressBar(Adafruit_GFX* gfx, uint16_t /*y*/, double percentage) {
-  uint16_t h = 7;
-  uint16_t w = 220;
-  uint16_t bar_w = static_cast<uint16_t>(percentage * 220);
-  gfx->fillRect(10, 120, w, h, 0xFFFF);
-  gfx->fillRect(10, 120, bar_w, h, 0xF800);
-  gfx->fillRect(bar_w + 10, 120 - 4, 2, h + 8, 0xF800);
+void DrawProgressBar(Adafruit_GFX* gfx, uint16_t y, double percentage) {
+  const Rect screen = ScreenRect();
+  const int16_t h = 7;
+  const int16_t x = screen.x;
+  const int16_t w = screen.w;
+  const int16_t bar_w = static_cast<int16_t>(percentage * w);
+  gfx->fillRect(x, y, w, h, 0xFFFF);
+  gfx->fillRect(x, y, bar_w, h, 0xF800);
+  gfx->fillRect(x + bar_w, y - 4, 2, h + 8, 0xF800);
 }
 
 }  // namespace
@@ -49,11 +51,12 @@ void DrawLaunch(Adafruit_GFX* gfx, const LaunchProps& props) {
                &top_region);
 
   gfx->setFont(&JetBrainsMono_Thin8pt7b);
+  const Rect screen = ScreenRect();
   Rect second_region;
-  second_region.x = 0;
+  second_region.x = screen.x;
   second_region.y = top_region.h + top_region.y + 10;
-  second_region.w = 240;
-  second_region.h = 135 - second_region.y;
+  second_region.w = screen.w;
+  second_region.h = screen.y + screen.h - second_region.y;
   WriteAligned(gfx, "Waiting for Launch", HAlign::Center, VAlign::Top,
                &second_region);
   char buffer[128];
@@ -66,9 +69,10 @@ void DrawInProgress(Adafruit_GFX* gfx, const InProgressProps& props) {
   gfx->setFont(&JetBrainsMono_Thin14pt7b);
   WriteAligned(gfx, "Quarter Mile", HAlign::Center, VAlign::Top);
 
-  const int x1 = 10;
-  const int x2 = 120;
-  const int y1 = 40;
+  const Rect screen = ScreenRect();
+  const int x1 = screen.x;
+  const int x2 = screen.x + screen.w / 2;
+  const int y1 = screen.y + 40;
   const int y_pitch = 46;
   char buffer[128];
   snprintf(buffer, sizeof(buffer), "%.1f s", props.timeSec);
@@ -86,7 +90,8 @@ void DrawInProgress(Adafruit_GFX* gfx, const InProgressProps& props) {
   double distance = props.distanceMiles;
   if (distance < 0) distance = 0;
   if (distance > 0.25) distance = 0.25;
-  DrawProgressBar(gfx, 120, distance / 0.25);
+  // Bar sits near the bottom of the visible area.
+  DrawProgressBar(gfx, VisibleBottom() - 16, distance / 0.25);
 }
 
 void DrawSummary(Adafruit_GFX* gfx, const SummaryProps& props) {
@@ -94,9 +99,10 @@ void DrawSummary(Adafruit_GFX* gfx, const SummaryProps& props) {
   gfx->setFont(&JetBrainsMono_Thin14pt7b);
   WriteAligned(gfx, "Quarter Mile", HAlign::Center, VAlign::Top);
 
-  const int x1 = 10;
-  const int x2 = 130;
-  const int y1 = 45;
+  const Rect screen = ScreenRect();
+  const int x1 = screen.x;
+  const int x2 = screen.x + screen.w / 2;
+  const int y1 = screen.y + 45;
   const int y_pitch = 55;
 
   char buffer[128];

@@ -37,9 +37,13 @@ const char* HeadingToDirection(float heading) {
 void DrawStatus(Adafruit_GFX* gfx, const StatusProps& props) {
   Clear(gfx);
 
-  const int x1 = 10;
-  const int x2 = 120;
-  const int y1 = 15;
+  // Two columns + three rows, laid out inside the bezel-aware drawable region so
+  // everything reflows when the bezel insets change. x1/x2 are the left edges of
+  // the two columns; y1 is the baseline of the first row's title.
+  const Rect screen = ScreenRect();
+  const int x1 = screen.x;
+  const int x2 = screen.x + screen.w / 2;
+  const int y1 = screen.y + 15;
   const int y_pitch = 42;
 
   char buffer[128];

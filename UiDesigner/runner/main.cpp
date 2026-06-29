@@ -76,32 +76,61 @@ int main() {
     std::printf("Wrote %s\n", outPath.string().c_str());
   }
 
-  // Composite grid: all screens, labeled, in a grid.
+  // Composite grid: all screens, labeled, in a grid. Each cell that has a
+  // non-zero bezel also gets the hidden border drawn as a translucent red
+  // overlay so it's obvious which pixels the physical bezel would clip.
   const int cols = 3;
   const int rows = (static_cast<int>(screens.size()) + cols - 1) / cols;
   const int label_h = 12;
   const int pad = 6;
   const int cell_w = w + pad * 2;
   const int cell_h = h + label_h + pad * 2;
-  GFXcanvas16 grid(cell_w * cols, cell_h * rows);
-  grid.fillScreen(0x18E3);  // dark gray background
 
-  for (size_t i = 0; i < screens.size(); ++i) {
-    int cx = static_cast<int>(i % cols) * cell_w;
-    int cy = static_cast<int>(i / cols) * cell_h;
-    canvas.fillScreen(0x0000);
-    screens[i].draw(&canvas);
-    // blit the screen into the grid
-    grid.drawRGBBitmap(cx + pad, cy + pad + label_h, canvas.getBuffer(), w, h);
-    grid.drawRect(cx + pad, cy + pad + label_h, w, h, 0xFFFF);
-    grid.setFont(nullptr);
-    grid.setTextSize(1);
-    grid.setTextColor(0xFFFF);
-    grid.setCursor(cx + pad, cy + pad);
-    grid.print(screens[i].name.c_str());
-  }
-  SaveBMP24(fs::path("out") / "all_screens.bmp", grid.getBuffer(), grid.width(),
-            grid.height());
-  std::printf("Wrote out/all_screens.bmp (%zu screens)\n", screens.size());
+  auto render_grid = [&](const fs::path& out_path, int16_t bz_top,
+                         int16_t bz_bottom, int16_t bz_left, int16_t bz_right) {
+    display::SetBezelInsets(bz_top, bz_bottom, bz_left, bz_right);
+    GFXcanvas16 grid(cell_w * cols, cell_h * rows);
+    grid.fillScreen(0x18E3);  // dark gray background
+
+    for (size_t i = 0; i < screens.size(); ++i) {
+      int cx = static_cast<int>(i % cols) * cell_w;
+      int cy = static_cast<int>(i / cols) * cell_h;
+      canvas.fillScreen(0x0000);
+      screens[i].draw(&canvas);
+      const int gx = cx + pad;
+      const int gy = cy + pad + label_h;
+      // blit the screen into the grid
+      grid.drawRGBBitmap(gx, gy, canvas.getBuffer(), w, h);
+      grid.drawRect(gx, gy, w, h, 0xFFFF);
+      // Shade the bezel-hidden border red so clipped content is obvious.
+      const uint16_t kBezelTint = 0xF800;  // red
+      if (bz_top > 0) grid.fillRect(gx, gy, w, bz_top, kBezelTint);
+      if (bz_bottom > 0)
+        grid.fillRect(gx, gy + h - bz_bottom, w, bz_bottom, kBezelTint);
+      if (bz_left > 0) grid.fillRect(gx, gy, bz_left, h, kBezelTint);
+      if (bz_right > 0)
+        grid.fillRect(gx + w - bz_right, gy, bz_right, h, kBezelTint);
+      grid.setFont(nullptr);
+      grid.setTextSize(1);
+      grid.setTextColor(0xFFFF);
+      grid.setCursor(cx + pad, cy + pad);
+      grid.print(screens[i].name.c_str());
+    }
+    SaveBMP24(out_path, grid.getBuffer(), grid.width(), grid.height());
+    std::printf("Wrote %s (%zu screens)\n", out_path.string().c_str(),
+                screens.size());
+  };
+
+  // Baseline: no bezel.
+  render_grid(fs::path("out") / "all_screens.bmp", 0, 0, 0, 0);
+
+  // Exaggerated, deliberately asymmetric bezel so it's easy to verify every
+  // screen reflows its content inward on all four sides (and to catch any edge
+  // that ignores a particular side). The red band marks the hidden region — no
+  // readable content should fall inside it.
+  render_grid(fs::path("out") / "all_screens_bezel.bmp", 14, 20, 18, 24);
+
+  // Leave the bezel reset so any later use of the lib starts clean.
+  display::SetBezelInsets(0, 0, 0, 0);
   return 0;
 }

@@ -12,9 +12,14 @@ void DrawGMeter(Adafruit_GFX* gfx, const GMeterProps& props) {
   Clear(gfx);
   gfx->setFont(&JetBrainsMono_Thin7pt7b);
 
-  // draw rings
-  int center_x = 129 + 50;
-  int center_y = gfx->height() / 2;
+  // All layout is anchored to the bezel-aware drawable region so it reflows when
+  // the bezel insets change. Two graphs occupy the left column; the g-force ring
+  // cluster sits in the right column, vertically centered.
+  const Rect screen = ScreenRect();
+
+  // draw rings: cluster centered in the right portion of the visible area.
+  int center_x = screen.x + screen.w - 50;
+  int center_y = screen.y + screen.h / 2;
   constexpr uint16_t line_color = 0xFFFF;
   constexpr uint16_t color = 0xF800;
   constexpr double max_g_ring = 0.6;
@@ -33,13 +38,16 @@ void DrawGMeter(Adafruit_GFX* gfx, const GMeterProps& props) {
     gfx->setCursor(x, y + JetBrainsMono_Thin7pt7b.yAdvance);
     gfx->print(text);
   };
-  drawText(159, -2, "Brake");
-  drawText(158, 115, "Accel");
-  drawText(8, 5, "Brake/Accel");
-  drawText(8, 63, "Lateral");
-  drawText(186, 72, ".2");
-  drawText(196, 83, ".4");
-  drawText(209, 96, ".6");
+  // Labels around the ring cluster, anchored to its center.
+  drawText(center_x - 20, center_y - 70, "Brake");
+  drawText(center_x - 21, center_y + 47, "Accel");
+  // Labels for the left-column graphs, anchored to the visible top-left.
+  drawText(screen.x, screen.y + 5, "Brake/Accel");
+  drawText(screen.x, screen.y + 63, "Lateral");
+  // Ring scale ticks, offset diagonally from the center along a radius.
+  drawText(center_x + 7, center_y + 4, ".2");
+  drawText(center_x + 17, center_y + 15, ".4");
+  drawText(center_x + 30, center_y + 28, ".6");
 
   // draw red dot.
   int16_t dot_x = center_x + static_cast<int16_t>(props.lateralLive / max_g_ring * 50);
@@ -51,8 +59,8 @@ void DrawGMeter(Adafruit_GFX* gfx, const GMeterProps& props) {
     if (!history) return;
     constexpr int16_t height = 38;
     constexpr int16_t width = 105;
-    int16_t x = 9;
-    int16_t y = row == 0 ? 25 : 83;
+    int16_t x = screen.x;
+    int16_t y = screen.y + (row == 0 ? 25 : 83);
 
     gfx->drawRect(x, y, width, height, line_color);
     // fill in the graph (width-2) with HistorySize elements; 1px at a time.

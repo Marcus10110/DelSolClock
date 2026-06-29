@@ -83,6 +83,8 @@ void DrawNavigation(Adafruit_GFX* gfx, const NavigationProps& props) {
   const int bmp_size = 80;  // 80x80 pixels
   Rect screen_rect = ScreenRect();
   int top_height = 20;
+  const int16_t text_x = screen_rect.x;
+  const int16_t text_y = screen_rect.y + top_height + 26;
   screen_rect.y += top_height;
   screen_rect.h -= top_height;
   if (is_left) {
@@ -99,7 +101,7 @@ void DrawNavigation(Adafruit_GFX* gfx, const NavigationProps& props) {
   line2 = Trim(line2);
   // line 1 in 8pt, line 2 in 10pt.
   gfx->setFont(&JetBrainsMono_Thin8pt7b);
-  gfx->setCursor(0, top_height + 26);
+  gfx->setCursor(text_x, text_y);
   gfx->write(line1.c_str());
   gfx->write("\n");
 

@@ -16,7 +16,11 @@ void DrawSplash(Adafruit_GFX* gfx) {
 
 void DrawLightsAlarm(Adafruit_GFX* gfx) {
   Clear(gfx);
-  DrawBMP(gfx, "/light_large.bmp", 68, 16);  // 104x104
+  // 104x104 icon, horizontally centered in the visible area, near its top.
+  constexpr int16_t icon = 104;
+  const Rect screen = ScreenRect();
+  DrawBMP(gfx, "/light_large.bmp", screen.x + (screen.w - icon) / 2,
+          screen.y + 16);
   gfx->setFont(&JetBrainsMono_Thin16pt7b);
   gfx->setTextSize(1);
   int16_t x, y;

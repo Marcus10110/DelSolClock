@@ -2,10 +2,12 @@
 
 #ifdef DEMO_ENABLED
 
+#include <cmath>
 #include <vector>
 
 #include "clock_screen.h"
 #include "gmeter_screen.h"
+#include "nav_overlay.h"
 #include "notification_screens.h"
 #include "perspective_screen.h"
 #include "quarter_mile_screens.h"
@@ -67,6 +69,25 @@ const std::vector<DemoScreen> g_demo_screens = {
        p.lateralG = 0.1;
        p.verticalG = 1.01;
        display::DrawStatus(g, p);
+     }},
+
+    {"GMeter",
+     [](Adafruit_GFX* g) {
+       // Synthetic history so the graphs have something to draw: a couple of
+       // sine waves at different rates, plus a live dot off-center.
+       static double brake[display::GMeterProps::HistorySize];
+       static double lateral[display::GMeterProps::HistorySize];
+       for (size_t i = 0; i < display::GMeterProps::HistorySize; ++i) {
+         double t = static_cast<double>(i);
+         brake[i] = 0.5 * std::sin(t * 0.20);
+         lateral[i] = 0.35 * std::sin(t * 0.12 + 1.0);
+       }
+       display::GMeterProps p;
+       p.brakeLive = -0.25;
+       p.lateralLive = 0.3;
+       p.brakeHistory = brake;
+       p.lateralHistory = lateral;
+       display::DrawGMeter(g, p);
      }},
 
     {"OtaInProgress",
@@ -225,6 +246,48 @@ const std::vector<DemoScreen> g_demo_screens = {
          p.centerline.push_back({d, right});
        }
        display::DrawPerspective(g, p);
+     }},
+
+    // The real turn-by-turn driving screen: the nav overlay (top strip +
+    // bottom bar) composited over the perspective road. Drawn for both themes.
+    {"NavOverlay",
+     [](Adafruit_GFX* g) {
+       display::PerspectiveProps p;
+       p.headingDegrees = 120.0f;
+       for (float d = 1.0f; d <= 120.0f; d += 4.0f) {
+         p.centerline.push_back({d, 0.0008f * d * d});  // gentle right bend
+       }
+       display::DrawPerspective(g, p);
+
+       display::NavOverlayProps ov;
+       ov.dir = display::TurnDir::Right;
+       ov.distance = "500 ft";
+       ov.street = "Eucalyptus Dr";
+       ov.eta = "5:42";
+       ov.remaining = "12.4 mi";
+       ov.speed = "34";
+       display::DrawNavOverlay(g, ov);
+     }},
+
+    {"NavOverlay-Day",
+     [](Adafruit_GFX* g) {
+       display::PerspectiveProps p;
+       p.daytime = true;
+       p.headingDegrees = 120.0f;
+       for (float d = 1.0f; d <= 120.0f; d += 4.0f) {
+         p.centerline.push_back({d, 0.0008f * d * d});
+       }
+       display::DrawPerspective(g, p);
+
+       display::NavOverlayProps ov;
+       ov.daytime = true;
+       ov.dir = display::TurnDir::Right;
+       ov.distance = "500 ft";
+       ov.street = "Eucalyptus Dr";
+       ov.eta = "5:42";
+       ov.remaining = "12.4 mi";
+       ov.speed = "34";
+       display::DrawNavOverlay(g, ov);
      }},
 };
 

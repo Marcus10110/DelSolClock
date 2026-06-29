@@ -70,19 +70,19 @@ void DrawClock(Adafruit_GFX* gfx, const ClockProps& props) {
     gfx->print("MPH");
   }
 
-  // headlight
+  // headlight (top-right corner of the visible area)
   if (props.headlight) {
     uint16_t color = 0x007F;  // green ~3, blue full.
-    DrawBMP(gfx, "/light_small.bmp", screen_rect.x + screen_rect.w - 32, 0,
-            false, color);
+    DrawBMP(gfx, "/light_small.bmp", screen_rect.x + screen_rect.w - 32,
+            screen_rect.y, false, color);
   }
 
-  // bluetooth
+  // bluetooth (left edge of the visible area, vertically centered)
   int16_t top = (screen_rect.h - 24 * 3) / 2 + screen_rect.y;
   if (props.bluetooth) {
-    DrawBMP(gfx, "/bluetooth.bmp", 0, top);
+    DrawBMP(gfx, "/bluetooth.bmp", screen_rect.x, top);
   } else {
-    DrawBMP(gfx, "/bluetooth.bmp", 0, top, false, 0xF800);
+    DrawBMP(gfx, "/bluetooth.bmp", screen_rect.x, top, false, 0xF800);
   }
 }
 
