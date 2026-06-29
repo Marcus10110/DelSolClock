@@ -4,6 +4,7 @@
 
 import { Emitter } from './emitter';
 import type {
+  BezelOffsets,
   ConnectionEvents,
   CrashDumpStatus,
   DebugCommand,
@@ -36,6 +37,7 @@ export class DemoConnection extends Emitter<ConnectionEvents> implements IConnec
   private tickHandle: ReturnType<typeof setInterval> | null = null;
   private step = 0;
   private voltage = 12.6;
+  private demoBezel: BezelOffsets = { top: 0, bottom: 0, left: 0, right: 0 };
 
   get state(): ConnectionState {
     return this._state;
@@ -149,6 +151,17 @@ export class DemoConnection extends Emitter<ConnectionEvents> implements IConnec
     if (command === 'CLEAR') this.demoHasCrash = false;
     if (command === 'ASSERT' || command === 'ASSERT_LATER') this.demoHasCrash = true;
     this.log('ok', `Sent debug command: ${command} (demo)`);
+  }
+
+  async readBezelOffsets(): Promise<BezelOffsets> {
+    await delay(80);
+    return { ...this.demoBezel };
+  }
+
+  async writeBezelOffsets(o: BezelOffsets): Promise<void> {
+    await delay(80);
+    this.demoBezel = { ...o };
+    this.log('ok', `Set bezel offsets (demo): ${JSON.stringify(o)}`);
   }
 
   async uploadRoute(

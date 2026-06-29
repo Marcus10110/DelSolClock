@@ -45,6 +45,14 @@ export type DebugCommand =
   | 'ASSERT'
   | 'ASSERT_LATER';
 
+/** Display bezel insets (px) per side; positive pushes content off that edge. */
+export interface BezelOffsets {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 export interface IConnection extends Emitter<ConnectionEvents> {
   readonly state: ConnectionState;
   readonly isConnected: boolean;
@@ -83,6 +91,12 @@ export interface IConnection extends Emitter<ConnectionEvents> {
 
   /** Send a debug control command (reboot, clear, print, assert…). */
   sendDebugCommand(command: DebugCommand): Promise<void>;
+
+  /** Read the device's current display bezel offsets. */
+  readBezelOffsets(): Promise<BezelOffsets>;
+
+  /** Write display bezel offsets (applied live + persisted on the device). */
+  writeBezelOffsets(offsets: BezelOffsets): Promise<void>;
 
   /**
    * Upload a navigation route to the device over the existing connection.

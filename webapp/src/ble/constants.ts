@@ -32,6 +32,7 @@ export const FW_HEADER_SIZE = 5;
 export const CHR_DEBUG_STATUS = '32a18dc5-fdda-4601-b5b7-dc2920ac3f37'; // R   "NOCRASH" | "CRASH:<bytes>:<chunks>"
 export const CHR_DEBUG_DATA = '2969eccf-48f1-4069-a662-1ae77fe69118'; // R   [u16 LE index][<=510 bytes], pointer auto-advances
 export const CHR_DEBUG_CONTROL = '65376e10-7797-435b-ac52-14ac0fab362c'; // W   "REBOOT"|"CLEAR"|"PRINT"|"ASSERT"|"ASSERT_LATER"
+export const CHR_DEBUG_BEZEL = '9a8b6f12-5d3e-4c7a-bf21-0e9d4c8a1b76'; // R/W  4 signed bytes [top,bottom,left,right] display bezel insets
 
 // Navigation service characteristic
 export const CHR_NAV_ROUTE = 'b9f0a2d1-6c3e-4a8b-9d27-1f5c0e6a4b30'; // W-NR/N  512-byte route chunks; notifies continue/success/error

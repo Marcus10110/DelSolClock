@@ -131,22 +131,31 @@ bool turnAngle(TurnDir d, float& angle) {
 
 void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
   gTh = props.daytime ? &kDayHud : &kNightHud;
-  const int16_t W = gfx->width();
+  // Work inside the bezel's visible area so the HUD text never lands under the
+  // hidden border. x0/x1 are the visible left/right edges; the bars hug the
+  // visible top and bottom.
+  const int16_t x0 = VisibleLeft();
+  const int16_t x1 = VisibleRight();  // exclusive
+  const int16_t vw = x1 - x0;
+  const int16_t visTop = VisibleTop();
+  const int16_t visBot = VisibleBottom();  // exclusive
 
   // ----- Top strip: arrow + distance + street -----
   if (props.dir != TurnDir::None) {
-    gfx->fillRect(0, 0, W, kStripH, kStripBg);
+    const int16_t stripTop = visTop;
+    const int16_t stripBot = visTop + kStripH;  // y of the bottom border
+    gfx->fillRect(x0, stripTop, vw, kStripH, kStripBg);
     // HUD chrome: a glowing magenta underline with brighter corner ticks, and a
     // thin divider separating the arrow box from the text.
-    gfx->drawFastHLine(0, kStripH, W, kChromeDim);
-    gfx->drawFastHLine(0, kStripH + 1, W, kChrome);
-    gfx->drawFastVLine(0, 0, kStripH, kChrome);
-    gfx->drawFastVLine(W - 1, 0, kStripH, kChrome);
-    gfx->drawFastVLine(34, 3, kStripH - 6, kChromeDim);  // arrow / text divider
+    gfx->drawFastHLine(x0, stripBot, vw, kChromeDim);
+    gfx->drawFastHLine(x0, stripBot + 1, vw, kChrome);
+    gfx->drawFastVLine(x0, stripTop, kStripH, kChrome);
+    gfx->drawFastVLine(x1 - 1, stripTop, kStripH, kChrome);
+    gfx->drawFastVLine(x0 + 34, stripTop + 3, kStripH - 6, kChromeDim);
 
     // Arrow box on the left.
-    const int16_t arrowCx = 18;
-    const int16_t arrowCy = kStripH / 2;
+    const int16_t arrowCx = x0 + 18;
+    const int16_t arrowCy = stripTop + kStripH / 2;
     const float arrowR = 12.0f;
     float angle;
     if (props.dir == TurnDir::Arrive) {
@@ -156,21 +165,21 @@ void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
     }
 
     gfx->setTextSize(1);  // custom fonts ignore this, but reset for safety
-    const int16_t textX = 40;
-    const int16_t maxW = W - textX - 4;
+    const int16_t textX = x0 + 40;
+    const int16_t maxW = x1 - textX - 4;
 
     // Distance: the most important element — large amber, top of the strip.
     // (10pt JetBrainsMono: cap height ~14px; baseline placed near the top.)
     gfx->setFont(&JetBrainsMono_Thin10pt7b);
     gfx->setTextColor(kAccent);
-    gfx->setCursor(textX, 16);
+    gfx->setCursor(textX, stripTop + 16);
     gfx->print(props.distance.c_str());
 
     // Street name (smaller, white) below the distance, truncated to fit.
     if (!props.street.empty()) {
       gfx->setFont(&JetBrainsMono_Thin7pt7b);
       gfx->setTextColor(kFg);
-      gfx->setCursor(textX, kStripH - 4);
+      gfx->setCursor(textX, stripTop + kStripH - 4);
       std::string s = props.street;
       while (!s.empty() &&
              MeasureWidth(&JetBrainsMono_Thin7pt7b, s) > maxW) {
@@ -182,40 +191,39 @@ void DrawNavOverlay(Adafruit_GFX* gfx, const NavOverlayProps& props) {
 
   // ----- Bottom bar: ETA / remaining / speed -----
   if (props.showBottomBar) {
-    const int16_t H = gfx->height();
-    const int16_t barY = H - kBarH;
-    gfx->fillRect(0, barY, W, kBarH, kStripBg);
+    const int16_t barY = visBot - kBarH;
+    gfx->fillRect(x0, barY, vw, kBarH, kStripBg);
     // HUD chrome: glowing magenta top border + corner ticks + field dividers.
-    gfx->drawFastHLine(0, barY, W, kChrome);
-    gfx->drawFastHLine(0, barY + 1, W, kChromeDim);
-    gfx->drawFastVLine(0, barY, kBarH, kChrome);
-    gfx->drawFastVLine(W - 1, barY, kBarH, kChrome);
+    gfx->drawFastHLine(x0, barY, vw, kChrome);
+    gfx->drawFastHLine(x0, barY + 1, vw, kChromeDim);
+    gfx->drawFastVLine(x0, barY, kBarH, kChrome);
+    gfx->drawFastVLine(x1 - 1, barY, kBarH, kChrome);
     // Two dividers splitting the bar into ETA | remaining | speed thirds.
-    const int16_t div1 = W / 3;
-    const int16_t div2 = (W * 2) / 3;
+    const int16_t div1 = x0 + vw / 3;
+    const int16_t div2 = x0 + (vw * 2) / 3;
     gfx->drawFastVLine(div1, barY + 3, kBarH - 4, kChromeDim);
     gfx->drawFastVLine(div2, barY + 3, kBarH - 4, kChromeDim);
 
     gfx->setFont(&JetBrainsMono_Thin7pt7b);
     gfx->setTextSize(1);
-    const int16_t textY = H - 4;
+    const int16_t textY = visBot - 4;
 
     // Left: ETA. Center: remaining. Right: speed (boxed, like a HUD readout).
     if (!props.eta.empty()) {
       gfx->setTextColor(kFg);
-      gfx->setCursor(5, textY);
+      gfx->setCursor(x0 + 5, textY);
       gfx->print(props.eta.c_str());
     }
     if (!props.remaining.empty()) {
       int16_t w = MeasureWidth(&JetBrainsMono_Thin7pt7b, props.remaining);
       gfx->setTextColor(kDim);
-      gfx->setCursor((W - w) / 2, textY);
+      gfx->setCursor(x0 + (vw - w) / 2, textY);
       gfx->print(props.remaining.c_str());
     }
     if (!props.speed.empty()) {
       // Speed sits in the right third; draw it cyan and boxed for a HUD readout.
       int16_t w = MeasureWidth(&JetBrainsMono_Thin7pt7b, props.speed);
-      int16_t sx = W - w - 8;
+      int16_t sx = x1 - w - 8;
       gfx->setTextColor(kAccent);
       gfx->setCursor(sx, textY);
       gfx->print(props.speed.c_str());

@@ -8,6 +8,7 @@ import {
   ADVERTISED_NAME,
   ALL_SERVICES,
   CHR_BATTERY,
+  CHR_DEBUG_BEZEL,
   CHR_DEBUG_CONTROL,
   CHR_DEBUG_DATA,
   CHR_DEBUG_STATUS,
@@ -31,6 +32,7 @@ import {
 } from './parsers';
 import type { ConnectionState } from './types';
 import type {
+  BezelOffsets,
   ConnectionEvents,
   CrashDumpStatus,
   DebugCommand,
@@ -521,6 +523,30 @@ export class DelSolConnection extends Emitter<ConnectionEvents> implements IConn
     const chr = await svc.getCharacteristic(CHR_DEBUG_CONTROL);
     await chr.writeValue(new TextEncoder().encode(command));
     this.log('ok', `Sent debug command: ${command}`);
+  }
+
+  /** Read the device's display bezel offsets (4 signed bytes). */
+  async readBezelOffsets(): Promise<BezelOffsets> {
+    if (!this.server) throw new Error('Not connected.');
+    const svc = await this.server.getPrimaryService(SVC_DEBUG);
+    const chr = await svc.getCharacteristic(CHR_DEBUG_BEZEL);
+    const v = await chr.readValue();
+    if (v.byteLength < 4) throw new Error('Bezel read too short.');
+    return {
+      top: v.getInt8(0),
+      bottom: v.getInt8(1),
+      left: v.getInt8(2),
+      right: v.getInt8(3),
+    };
+  }
+
+  /** Write display bezel offsets (applied live + persisted on the device). */
+  async writeBezelOffsets(o: BezelOffsets): Promise<void> {
+    if (!this.server) throw new Error('Not connected.');
+    const svc = await this.server.getPrimaryService(SVC_DEBUG);
+    const chr = await svc.getCharacteristic(CHR_DEBUG_BEZEL);
+    const buf = new Int8Array([o.top, o.bottom, o.left, o.right]);
+    await chr.writeValue(buf);
   }
 
   async uploadRoute(

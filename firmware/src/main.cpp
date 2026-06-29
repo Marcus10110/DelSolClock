@@ -9,6 +9,7 @@
 #include "current_time_service.h"
 #include "apple_media_service.h"
 #include "tft.h"
+#include "display_config.h"
 #include "draw_helpers.h"
 #include "clock_screen.h"
 #include "simple_screens.h"
@@ -104,6 +105,7 @@ void setup()
 
     // Required before we can handle the lights-only power mode.
     CarIO::Setup();
+    DisplayConfig::Begin();  // load persisted bezel offsets before any draw
     gTft = new Tft::Tft();
     gTft->Init();
 

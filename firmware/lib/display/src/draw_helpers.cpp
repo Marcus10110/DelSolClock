@@ -1,10 +1,44 @@
 #include "draw_helpers.h"
 
 namespace display {
+namespace {
+// Bezel insets (px per side), runtime-set. Default 0 — the firmware loads the
+// persisted values at boot. These shrink the usable area on all four sides.
+int16_t gBezelTop = 0, gBezelBottom = 0, gBezelLeft = 0, gBezelRight = 0;
+}  // namespace
+
+void SetBezelInsets(int16_t top, int16_t bottom, int16_t left, int16_t right) {
+  gBezelTop = top;
+  gBezelBottom = bottom;
+  gBezelLeft = left;
+  gBezelRight = right;
+}
+
+void GetBezelInsets(int16_t* top, int16_t* bottom, int16_t* left,
+                    int16_t* right) {
+  if (top) *top = gBezelTop;
+  if (bottom) *bottom = gBezelBottom;
+  if (left) *left = gBezelLeft;
+  if (right) *right = gBezelRight;
+}
+
+int16_t VisibleLeft() { return gBezelLeft; }
+int16_t VisibleTop() { return gBezelTop; }
+int16_t VisibleRight() { return kWidth - gBezelRight; }
+int16_t VisibleBottom() { return kHeight - gBezelBottom; }
+int16_t VisibleWidth() { return kWidth - gBezelLeft - gBezelRight; }
+int16_t VisibleHeight() { return kHeight - gBezelTop - gBezelBottom; }
 
 Rect ScreenRect() {
-  return Rect{kLeftPadding, kTopPadding, kWidth - kLeftPadding - kRightPadding,
-              kHeight - kTopPadding - kBottomPadding};
+  // The drawable region is the full panel minus the bezel insets on each side.
+  // (These are the single source of edge padding — tuned over BLE, persisted in
+  // NVS, default 0.)
+  const int16_t l = gBezelLeft;
+  const int16_t t = gBezelTop;
+  const int16_t r = gBezelRight;
+  const int16_t b = gBezelBottom;
+  return Rect{l, t, static_cast<int16_t>(kWidth - l - r),
+              static_cast<int16_t>(kHeight - t - b)};
 }
 
 void Clear(Adafruit_GFX* gfx) {

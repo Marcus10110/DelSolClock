@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "utilities.h"
+#include "display_config.h"
 
 #include "BLE2902.h"
 #include <BLEServer.h>
@@ -15,6 +16,8 @@
 #define DEBUG_STATUS_CHARACTERISTIC_UUID "32a18dc5-fdda-4601-b5b7-dc2920ac3f37"
 #define DEBUG_DATA_CHARACTERISTIC_UUID "2969eccf-48f1-4069-a662-1ae77fe69118"
 #define DEBUG_CONTROL_CHARACTERISTIC_UUID "65376e10-7797-435b-ac52-14ac0fab362c"
+// Bezel offsets (read+write): 4 signed bytes [top, bottom, left, right].
+#define DEBUG_BEZEL_CHARACTERISTIC_UUID "9a8b6f12-5d3e-4c7a-bf21-0e9d4c8a1b76"
 
 namespace DebugService
 {
@@ -23,6 +26,16 @@ namespace DebugService
         BLECharacteristic* DebugStatusCharacteristic = nullptr;
         BLECharacteristic* DebugDataCharacteristic = nullptr;
         BLECharacteristic* DebugControlCharacteristic = nullptr;
+        BLECharacteristic* DebugBezelCharacteristic = nullptr;
+
+        // Pack the current bezel offsets into the characteristic value.
+        void PublishBezel()
+        {
+            const auto& o = DisplayConfig::Get();
+            uint8_t buf[ 4 ] = { ( uint8_t )o.top, ( uint8_t )o.bottom,
+                                 ( uint8_t )o.left, ( uint8_t )o.right };
+            DebugBezelCharacteristic->setValue( buf, sizeof( buf ) );
+        }
 
         std::atomic<bool> ShouldAssert = false;
 
@@ -188,6 +201,28 @@ namespace DebugService
 
         DebugControlCallbacks DebugControlCB;
 
+        class DebugBezelCallbacks : public BLECharacteristicCallbacks
+        {
+            void onWrite( BLECharacteristic* pCharacteristic, esp_ble_gatts_cb_param_t* param ) override
+            {
+                std::string v = pCharacteristic->getValue();
+                if( v.size() < 4 )
+                {
+                    LOG_WARN( "bezel write too short (%d bytes)", ( int )v.size() );
+                    return;
+                }
+                DisplayConfig::BezelOffsets o;
+                o.top = static_cast<int8_t>( v[ 0 ] );
+                o.bottom = static_cast<int8_t>( v[ 1 ] );
+                o.left = static_cast<int8_t>( v[ 2 ] );
+                o.right = static_cast<int8_t>( v[ 3 ] );
+                DisplayConfig::Set( o );  // applies live + persists to NVS
+                PublishBezel();           // reflect the clamped values back
+            }
+        };
+
+        DebugBezelCallbacks DebugBezelCB;
+
     }
 
 
@@ -211,6 +246,14 @@ namespace DebugService
             debug_service->createCharacteristic( DEBUG_CONTROL_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_WRITE );
         DebugControlCharacteristic->addDescriptor( new BLE2902() );
         DebugControlCharacteristic->setCallbacks( &DebugControlCB );
+
+        LOG_TRACE( "creating debug bezel characteristic" );
+        DebugBezelCharacteristic = debug_service->createCharacteristic(
+            DEBUG_BEZEL_CHARACTERISTIC_UUID,
+            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE );
+        DebugBezelCharacteristic->addDescriptor( new BLE2902() );
+        DebugBezelCharacteristic->setCallbacks( &DebugBezelCB );
+        PublishBezel();  // seed with the persisted values so a read returns them
 
         size_t core_size = 0;
         bool has_core = CoreDumpIsAvailable( &core_size );

@@ -470,5 +470,15 @@ int main(int argc, char** argv) {
       std::printf("Wrote out/%s (daytime)\n", nm);
     }
   }
+
+  // Bezel-inset preview: render one frame with a chunky inset to confirm the HUD
+  // reflows inside the visible area (the dark border is the hidden bezel region).
+  if (!samplesList.empty()) {
+    display::SetBezelInsets(/*top=*/12, /*bottom=*/12, /*left=*/16, /*right=*/16);
+    RenderAt(canvas, route, cum, samplesList.front().distanceM);
+    SaveBMP24(fs::path("out") / "bezel_demo.bmp", canvas.getBuffer(), W, H);
+    display::SetBezelInsets(0, 0, 0, 0);  // reset
+    std::printf("Wrote out/bezel_demo.bmp (inset preview)\n");
+  }
   return 0;
 }

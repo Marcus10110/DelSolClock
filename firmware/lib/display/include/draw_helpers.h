@@ -14,12 +14,10 @@
 namespace display {
 
 // Display geometry + default style (ported from the old Display::Display).
+// Edge padding is no longer a fixed constant — it's the runtime bezel insets
+// below (SetBezelInsets), which ScreenRect() subtracts from the panel.
 constexpr int16_t kWidth = 240;
 constexpr int16_t kHeight = 136;
-constexpr int16_t kTopPadding = 5;
-constexpr int16_t kBottomPadding = 10;
-constexpr int16_t kLeftPadding = 0;
-constexpr int16_t kRightPadding = 0;
 constexpr uint16_t kDefaultTextColor = 0xFFFF;
 constexpr uint16_t kDefaultBackgroundColor = 0x0000;
 constexpr uint8_t kDefaultFontSize = 1;
@@ -34,8 +32,26 @@ struct Rect {
   int16_t h{0};
 };
 
-// The drawable region inside the padding (the old Display::ScreenRect()).
+// Bezel insets (px per side) the physical bezel hides. ADDED on top of the
+// content padding above, so the drawable region shrinks to what's actually
+// visible. Runtime-adjustable (tuned over BLE, persisted in NVS by the
+// firmware); the display lib just holds the current values so all layout code
+// keying off ScreenRect()/kWidth-aware helpers reflows automatically.
+void SetBezelInsets(int16_t top, int16_t bottom, int16_t left, int16_t right);
+void GetBezelInsets(int16_t* top, int16_t* bottom, int16_t* left, int16_t* right);
+
+// The drawable region inside the padding + bezel insets (old ScreenRect()).
 Rect ScreenRect();
+
+// The visible-area edges accounting for the bezel: the first/last usable column
+// and row. Full-bleed screens (e.g. the perspective view) use these so they
+// don't draw into the hidden border.
+int16_t VisibleLeft();
+int16_t VisibleTop();
+int16_t VisibleRight();   // exclusive: one past the last visible column
+int16_t VisibleBottom();  // exclusive: one past the last visible row
+int16_t VisibleWidth();
+int16_t VisibleHeight();
 
 // Clear to background and restore default cursor/color/wrap/font/size.
 void Clear(Adafruit_GFX* gfx);
