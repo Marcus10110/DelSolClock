@@ -106,6 +106,7 @@ export class GpsRecorderPanel {
           true,
         );
       } else {
+        console.error('GPS recorder status read failed:', err);
         this.setStatus(`Status read failed: ${errMsg(err)}`, true);
       }
     }
@@ -240,7 +241,22 @@ function formatBytes(n: number): string {
 }
 
 function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  // Surface as much as we can — Web Bluetooth GATT failures are often a
+  // DOMException whose `.message` is empty/terse, with the useful bit in
+  // `.name`. A bare value (e.g. a numeric ATT error code) also needs help.
+  if (err instanceof Error) {
+    const name = err.name && err.name !== 'Error' ? `${err.name}: ` : '';
+    return `${name}${err.message || '(no message)'}`;
+  }
+  if (err === null || err === undefined) return String(err);
+  if (typeof err === 'object') {
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return Object.prototype.toString.call(err);
+    }
+  }
+  return String(err);
 }
 
 function escapeHtml(s: string): string {
